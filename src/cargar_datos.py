@@ -62,3 +62,32 @@ def cargar_vertientes() -> dict:
         for row in csv.DictReader(f):
             out[row["bloque"]] = {"favorece": row["favorece"], "descripcion": row["descripcion"]}
     return out
+
+
+def cargar_overrides() -> dict:
+    """Ajustes de trasvase por departamento (idiosincrasia local).
+
+    Formato CSV: departamento,tipo,clave,keiko,sanchez,null,nota
+      tipo = 'partido' (clave = nombre del partido) o 'bloque' (clave = bloque ideológico).
+    Devuelve { depto_norm: {'partido': {partido_norm: shares}, 'bloque': {bloque: shares}} }.
+    Archivo opcional: si no existe, no hay overrides (se usa la matriz nacional).
+    """
+    path = DATA_DIR / "overrides_departamento.csv"
+    out: dict = {}
+    if not path.exists():
+        return out
+    with open(path, encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            if not row.get("departamento", "").strip():
+                continue
+            k = float(row["keiko"]); s = float(row["sanchez"]); n = float(row["null"])
+            if abs(k + s + n - 100) > 0.01:
+                raise ValueError(f"Override {row['departamento']}/{row['clave']} no suma 100")
+            tipo = row["tipo"].strip().lower()
+            if tipo not in ("partido", "bloque"):
+                raise ValueError(f"tipo inválido '{tipo}' (usar 'partido' o 'bloque')")
+            clave = norm(row["clave"]) if tipo == "partido" else row["clave"].strip().lower()
+            d = out.setdefault(norm(row["departamento"]), {"partido": {}, "bloque": {}})
+            d[tipo][clave] = {"keiko": k / 100, "sanchez": s / 100, "null": n / 100,
+                              "nota": row.get("nota", "")}
+    return out
