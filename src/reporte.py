@@ -91,7 +91,7 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indi
             d = nac_part.setdefault(pn, {"partido": info["partido"], "votos": 0})
             d["votos"] += info["votos"]
 
-    embed = {"nacional": _entrada("PERÚ — proyección nacional", nac, None,
+    embed = {"nacional": _entrada("PERÚ — resultado proyectado", nac, None,
                                   sum(p["votos"] for p in nac_part.values()), None, nac_part, resolver),
              "departamentos": {}}
     for depto, prj_esc in proyeccion["departamentos"].items():
@@ -121,6 +121,12 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indi
         nac_hist.append({"f": f, "net": round(num / den, 3) if den else 0.0})
     embed["nacional"]["hist"] = nac_hist
     embed["nacional"]["tend"] = round(nac_hist[-1]["net"] - nac_hist[-2]["net"], 3) if len(nac_hist) >= 2 else 0.0
+    # IAR Nacional = agregación (ponderada por peso electoral) de los IAR departamentales.
+    # De este agregado bottom-up sale el resultado proyectado nacional.
+    net_nac = nac_hist[-1]["net"] if nac_hist else 0.0
+    embed["nacional"]["net"] = net_nac
+    embed["nacional"]["iarK"] = round(50 + net_nac * 50)
+    embed["nacional"]["iarS"] = round(50 - net_nac * 50)
 
     bisagra_tbl = _tabla(
         ["#", "Departamento", "Votos válidos 1ra v.", "Margen base", "favK", "favS"],
@@ -479,8 +485,10 @@ function render(key){
         <span class="iar-hint">0 = ignorar redes · rompe el voto indeciso hacia quien tiene mejor aceptación</span></div>
     </div>` : "";
   const iarNac = key ? "" : `<div class="iar">
-      <div class="iar-hd">Aceptación en redes (IAR) · <span class="lead">indicador adelantado nacional</span></div>
-      <div class="iar-tend">Tendencia: ${tendTxt(DATA.nacional.tend)}</div>
+      <div class="iar-hd">IAR Nacional · <span class="lead">indicador adelantado</span> —
+        <b style="color:#C2410C">Keiko ${DATA.nacional.iarK}</b> · <b style="color:#B91C1C">Sánchez ${DATA.nacional.iarS}</b>
+        <span class="iar-net">(neto ${DATA.nacional.net>0?'+':''}${Math.round(DATA.nacional.net*100)})</span></div>
+      <div class="iar-tend">Agrega los 25 departamentos (ponderado por peso electoral) → <b>genera el resultado proyectado de arriba</b>. Tendencia: ${tendTxt(DATA.nacional.tend)}</div>
       <div id="iar-spark"></div></div>`;
 
   document.getElementById("panel").innerHTML = `
