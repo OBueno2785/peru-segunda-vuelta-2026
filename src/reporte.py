@@ -93,7 +93,8 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indi
 
     embed = {"nacional": _entrada("PERÚ — resultado proyectado", nac, None,
                                   sum(p["votos"] for p in nac_part.values()), None, nac_part, resolver),
-             "departamentos": {}}
+             "departamentos": {},
+             "meta": {"nBisagra": len(clasif["bisagra"])}}
     for depto, prj_esc in proyeccion["departamentos"].items():
         cl = clasif["por_departamento"][depto]
         ent = _entrada(depto, prj_esc, cl["categoria"], cl["peso"], norm(depto), pv[depto], resolver)
@@ -196,11 +197,19 @@ _PLANTILLA = r"""<!DOCTYPE html>
   .pnl-title { display:flex; align-items:center; gap:8px; margin:0 0 2px; font-size:1.1rem; }
   .badge { font-size:.72rem; padding:2px 8px; border-radius:6px; font-weight:600; }
   .pnl-sub { color:#6b7280; font-size:.8rem; margin-bottom:10px; }
-  .res { display:flex; gap:10px; margin:8px 0 4px; }
-  .res .b { flex:1; border-radius:8px; padding:8px 10px; color:#fff; }
-  .res .b.k { background:#C2410C; } .res .b.s { background:#B91C1C; }
-  .res .b .big { font-size:1.45rem; font-weight:700; line-height:1; }
-  .res .b .lbl { font-size:.72rem; opacity:.9; }
+  .takeaway { font-size:.92rem; line-height:1.35; background:#f1f5f9; border-left:4px solid #475569;
+              padding:8px 11px; border-radius:6px; margin:8px 0; }
+  .takeaway b.k { color:#C2410C; } .takeaway b.s { color:#B91C1C; }
+  .tug { margin:10px 0 2px; }
+  .tug-bar { position:relative; display:flex; height:34px; border-radius:7px; overflow:hidden;
+             box-shadow:inset 0 0 0 1px rgba(0,0,0,.06); }
+  .tug-seg { display:flex; align-items:center; color:#fff; font-weight:700; font-size:1rem;
+             transition:width .25s ease; min-width:42px; }
+  .tug-seg.k { background:#C2410C; justify-content:flex-start; padding-left:9px; }
+  .tug-seg.s { background:#B91C1C; justify-content:flex-end; padding-right:9px; }
+  .tug-50 { position:absolute; left:50%; top:-3px; bottom:-3px; width:0; border-left:2px dashed #1f2937; }
+  .tug-50::after { content:"50%"; position:absolute; top:-14px; left:-11px; font-size:.6rem; color:#1f2937; }
+  .tug-lbls { display:flex; justify-content:space-between; font-size:.72rem; color:#6b7280; margin-top:3px; }
   #panel-chart { height:230px; margin:6px 0 4px; }
   .toolbar { display:flex; align-items:center; gap:8px; margin:10px 0 4px; flex-wrap:wrap; }
   .toolbar .lbl { font-weight:600; font-size:.85rem; margin-right:auto; }
@@ -256,7 +265,7 @@ _PLANTILLA = r"""<!DOCTYPE html>
 
 <div class="wrap">
   <div class="card">
-    <div class="hd"><span id="map-hd">Mapa nacional · clic en un departamento</span>
+    <div class="hd"><span id="map-hd">Mapa · 🟧 gana Keiko · 🟨 bisagra (se decide) · 🟥 gana Sánchez — clic en un departamento</span>
       <button id="map-back" style="display:none" onclick="render(null)">← Mapa nacional</button></div>
     <div id="mapa"></div>
   </div>
@@ -284,6 +293,7 @@ const ALPHA = 0.5, U_ANCLA = 10, U_BIS = 5;
 const fmt = n => (n==null?"—":Math.round(n).toLocaleString("es-PE"));
 const STATE = {}; let CUR = null;
 let PESO_IAR = __PESOIAR__;   // intensidad del Índice de Aceptación en Redes (slider)
+const META = DATA.meta;
 const clon = o => JSON.parse(JSON.stringify(o));
 const textoDark = lab => (lab.includes("Inclina")||lab==="Bisagra");
 const tendTxt = t => { const a=Math.round(Math.abs(t)*100);
@@ -348,8 +358,8 @@ function mapaNacional(){
     type:"choropleth", geojson:GEO, featureidkey:"properties.KEY",
     locations:grupos[c], z:grupos[c].map(()=>1), showscale:false,
     colorscale:[[0,CATCOLOR[CATLABEL[c]]],[1,CATCOLOR[CATLABEL[c]]]],
-    name:CATLABEL[c], showlegend:true, marker:{line:{width:.4,color:"#fff"}},
-    hovertemplate:"<b>%{location}</b><br>"+CATLABEL[c]+" · clic para ver<extra></extra>"
+    name:`${CATLABEL[c]} (${grupos[c].length})`, showlegend:true, marker:{line:{width:.4,color:"#fff"}},
+    hovertemplate:"<b>%{location}</b><br>"+CATLABEL[c]+" · clic para ver el detalle<extra></extra>"
   }));
   Plotly.react("mapa", traces, {
     geo:{fitbounds:"locations", visible:false, bgcolor:"rgba(0,0,0,0)"},
@@ -359,7 +369,8 @@ function mapaNacional(){
   const gd=document.getElementById("mapa");
   gd.removeAllListeners && gd.removeAllListeners("plotly_click");
   gd.on("plotly_click", e=>{ if(e.points&&e.points.length) render(e.points[0].location); });
-  document.getElementById("map-hd").textContent = "Mapa nacional · clic en un departamento";
+  document.getElementById("map-hd").textContent =
+    "Mapa · 🟧 gana Keiko · 🟨 bisagra (se decide) · 🟥 gana Sánchez — clic en un departamento";
   document.getElementById("map-back").style.display = "none";
 }
 function mapaDepto(key, catKey){
@@ -381,6 +392,23 @@ function mapaDepto(key, catKey){
 }
 
 // ── Panel ──────────────────────────────────────────────────────────────────
+function pintarResultado(b, key, catKey){
+  const k=b.k, s=b.s, gan=b.ganador==="keiko"?"Keiko":"Sánchez", cls=b.ganador==="keiko"?"k":"s";
+  const tk=document.getElementById("tug-k"), ts=document.getElementById("tug-s");
+  tk.style.width=k+"%"; tk.textContent=k.toFixed(1)+"%";
+  ts.style.width=s+"%"; ts.textContent=s.toFixed(1)+"%";
+  let txt;
+  if(!key){
+    txt = `<b class="${cls}">${gan}</b> lidera la proyección <b>${Math.max(k,s).toFixed(1)}–${Math.min(k,s).toFixed(1)}</b>. `
+        + `Pero <b>${META.nBisagra} departamentos bisagra</b> (amarillos) aún pueden inclinar la elección.`;
+  } else {
+    const lab = catKey?CATLABEL[catKey]:"";
+    txt = `Aquí gana <b class="${cls}">${gan}</b> por <b>${Math.abs(b.margen).toFixed(1)} pts</b> — ${lab}.`
+        + (catKey==="bisagra" ? " <b>Puede voltear</b> según el escenario o las redes." : "");
+  }
+  document.getElementById("takeaway").innerHTML = txt;
+}
+
 function tablaPartidos(parts, editable){
   let hayOv = parts.some(p=>p.override);
   let rows = parts.map((p,i)=>{
@@ -418,12 +446,11 @@ function chart(esc){
 }
 function refrescar(){
   const d = entrada(CUR), esc = calcEsc(d), b = esc.base;
-  document.querySelector(".res .b.k .big").textContent = b.k+"%";
-  document.querySelector(".res .b.s .big").textContent = b.s+"%";
-  const gan = b.ganador==="keiko"?"Keiko":"Sánchez";
+  const ck = CUR ? calcCat(esc) : null;
   document.getElementById("sub").textContent =
-    `Votos válidos 1ra vuelta: ${fmt(d.peso)} · gana ${gan} (base) · margen ${b.margen>=0?"+":""}${b.margen} pts`;
-  if(CUR){ const ck=calcCat(esc), lab=CATLABEL[ck], bd=document.getElementById("badge");
+    `Votos válidos 1ra vuelta: ${fmt(d.peso)} · escenario base`;
+  pintarResultado(b, CUR, ck);
+  if(CUR){ const lab=CATLABEL[ck], bd=document.getElementById("badge");
            bd.textContent=lab; bd.style.background=CATCOLOR[lab]; bd.style.color=textoDark(lab)?"#1f2937":"#fff";
            mapaDepto(CUR, ck); }
   chart(esc);
@@ -494,9 +521,10 @@ function render(key){
   document.getElementById("panel").innerHTML = `
     <h2 class="pnl-title">${d.nombre} ${badgeHTML(catKey)}</h2>
     <div class="pnl-sub" id="sub">Votos válidos 1ra vuelta: ${fmt(d.peso)} · gana ${gan} (base) · margen ${b.margen>=0?"+":""}${b.margen} pts</div>
-    <div class="res">
-      <div class="b k"><div class="big">${b.k}%</div><div class="lbl">Keiko (FP)</div></div>
-      <div class="b s"><div class="big">${b.s}%</div><div class="lbl">Sánchez (JxP)</div></div>
+    <div class="takeaway" id="takeaway"></div>
+    <div class="tug">
+      <div class="tug-bar"><div class="tug-seg k" id="tug-k"></div><div class="tug-seg s" id="tug-s"></div><div class="tug-50"></div></div>
+      <div class="tug-lbls"><span>● Keiko (FP)</span><span>Sánchez (JxP) ●</span></div>
     </div>
     <div id="panel-chart"></div>
     ${iarBlock}${iarNac}
@@ -518,6 +546,7 @@ function render(key){
   } else {
     mapaNacional();
   }
+  pintarResultado(b, key, catKey);
   chart(esc);
   drawSpark(key ? d.hist : DATA.nacional.hist);
 }
