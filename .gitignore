@@ -7,6 +7,6 @@ __pycache__/
 informe.html
 resultados.json
 
-# Preview local
-index.html
+# Preview local (solo la copia en la raíz; docs/index.html SÍ se publica en Pages)
+/index.html
 .claude/
