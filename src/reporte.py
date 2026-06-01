@@ -91,10 +91,18 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indi
             d = nac_part.setdefault(pn, {"partido": info["partido"], "votos": 0})
             d["votos"] += info["votos"]
 
+    def _vks(depto, esc="base"):
+        pr = proyeccion["departamentos"][depto][esc]
+        return pr["votos_keiko"], pr["votos_sanchez"]
+    en_juego_bisagra = sum(sum(_vks(d["departamento"])) for d in clasif["bisagra"])
+    dif_nacional = nac["base"]["votos_keiko"] - nac["base"]["votos_sanchez"]
     embed = {"nacional": _entrada("PERÚ — resultado proyectado", nac, None,
                                   sum(p["votos"] for p in nac_part.values()), None, nac_part, resolver),
              "departamentos": {},
-             "meta": {"nBisagra": len(clasif["bisagra"])}}
+             "meta": {"nBisagra": len(clasif["bisagra"]),
+                      "enJuegoBisagra": en_juego_bisagra,
+                      "difNacional": dif_nacional,
+                      "ganadorNac": nac["base"]["ganador"]}}
     for depto, prj_esc in proyeccion["departamentos"].items():
         cl = clasif["por_departamento"][depto]
         ent = _entrada(depto, prj_esc, cl["categoria"], cl["peso"], norm(depto), pv[depto], resolver)
@@ -108,6 +116,7 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indi
     # Nacional ya ajustado por IAR (no se recalcula en vivo): se embebe precomputado
     embed["nacional"]["escNac"] = {
         e: {"k": nac[e]["pct_keiko"], "s": nac[e]["pct_sanchez"],
+            "vk": nac[e]["votos_keiko"], "vs": nac[e]["votos_sanchez"],
             "margen": nac[e]["margen"], "ganador": nac[e]["ganador"]} for e in ESCENARIOS}
     # Serie nacional del IAR (promedio ponderado por peso electoral) = indicador adelantado
     pesos = {norm(d): clasif["por_departamento"][d]["peso"] for d in clasif["por_departamento"]}
@@ -129,11 +138,19 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indi
     embed["nacional"]["iarK"] = round(50 + net_nac * 50)
     embed["nacional"]["iarS"] = round(50 - net_nac * 50)
 
+    def _bisagra_fila(i, d):
+        vk, vs = _vks(d["departamento"])
+        gana = "Keiko" if vk >= vs else "Sánchez"
+        return [i + 1, d["departamento"], gana, f"{abs(vk - vs):,}", f"{vk + vs:,}",
+                f"{d['margen_base']:+.1f}", f"{d['margenes']['favK']:+.1f}", f"{d['margenes']['favS']:+.1f}"]
     bisagra_tbl = _tabla(
-        ["#", "Departamento", "Margen proyectado", "favK", "favS"],
-        [[i + 1, d["departamento"], f"{d['margen_base']:+.1f}",
-          f"{d['margenes']['favK']:+.1f}", f"{d['margenes']['favS']:+.1f}"]
-         for i, d in enumerate(clasif["bisagra"])])
+        ["#", "Departamento", "Gana", "Dif. votos", "Votos en juego", "Margen %", "favK", "favS"],
+        [_bisagra_fila(i, d) for i, d in enumerate(clasif["bisagra"])])
+    _gn = "Keiko" if nac["base"]["ganador"] == "keiko" else "Sánchez"
+    bisagra_tbl += (f'<p style="font-size:.82rem;color:#374151;margin:8px 2px 0">'
+                    f'En los <b>{len(clasif["bisagra"])} departamentos bisagra</b> hay '
+                    f'<b>{en_juego_bisagra:,} votos proyectados en juego</b>. A nivel nacional, '
+                    f'<b>{_gn}</b> aventaja por <b>{abs(dif_nacional):,} votos</b> (escenario base).</p>')
 
     filas_t = []
     for t in sorted(transf.values(), key=lambda x: -(x["keiko"] - x["sanchez"])):
@@ -328,7 +345,7 @@ function calcEsc(d){
     const movidos = frac * Math.max(0, d.peso - vk - vs);
     if(net>0) vk+=movidos; else if(net<0) vs+=movidos;
     const dos=(vk+vs)||1;
-    return {k:+(vk/dos*100).toFixed(2), s:+(vs/dos*100).toFixed(2),
+    return {k:+(vk/dos*100).toFixed(2), s:+(vs/dos*100).toFixed(2), vk:Math.round(vk), vs:Math.round(vs),
             margen:+((vk-vs)/dos*100).toFixed(2), ganador: vk>=vs?"keiko":"sanchez"};
   };
   return {base:tally("base"), favK:tally("favK"), favS:tally("favS")};
@@ -397,14 +414,15 @@ function pintarResultado(b, key, catKey){
   const tk=document.getElementById("tug-k"), ts=document.getElementById("tug-s");
   tk.style.width=k+"%"; tk.textContent=k.toFixed(1)+"%";
   ts.style.width=s+"%"; ts.textContent=s.toFixed(1)+"%";
+  const dif = Math.abs((b.vk||0)-(b.vs||0));
   let txt;
   if(!key){
-    txt = `<b class="${cls}">${gan}</b> lidera la proyección <b>${Math.max(k,s).toFixed(1)}–${Math.min(k,s).toFixed(1)}</b>. `
-        + `Pero <b>${META.nBisagra} departamentos bisagra</b> (amarillos) aún pueden inclinar la elección.`;
+    txt = `<b class="${cls}">${gan}</b> lidera la proyección <b>${Math.max(k,s).toFixed(1)}–${Math.min(k,s).toFixed(1)}</b> (≈<b>${fmt(dif)}</b> votos). `
+        + `Pero <b>${META.nBisagra} departamentos bisagra</b> concentran <b>${fmt(META.enJuegoBisagra)} votos en juego</b> que pueden inclinar la elección.`;
   } else {
     const lab = catKey?CATLABEL[catKey]:"";
-    txt = `Aquí gana <b class="${cls}">${gan}</b> por <b>${Math.abs(b.margen).toFixed(1)} pts</b> — ${lab}.`
-        + (catKey==="bisagra" ? " <b>Puede voltear</b> según el escenario o las redes." : "");
+    txt = `Aquí gana <b class="${cls}">${gan}</b> por <b>${Math.abs(b.margen).toFixed(1)} pts</b> (≈<b>${fmt(dif)}</b> votos) — ${lab}.`
+        + (catKey==="bisagra" ? ` <b>Puede voltear</b>: ${fmt(b.vk+b.vs)} votos en juego.` : "");
   }
   document.getElementById("takeaway").innerHTML = txt;
 }
