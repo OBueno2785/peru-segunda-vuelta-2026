@@ -47,6 +47,25 @@ Fuentes:
 - Ipsos (31-may): en votos válidos **Keiko 51,4% vs Sánchez 48,6%**.
 - Datum (30-may): **Keiko 52,9% vs Sánchez 47,1%** (válidos). [Infobae](https://www.infobae.com/peru/2026/05/22/ultima-encuesta-datum-keiko-fujimori-lidera-con-395-frente-a-roberto-sanchez-con-361-a-dos-semanas-del-balotaje/)
 
+## Índice de Aceptación en Redes (IAR) — snapshot 1-jun-2026
+
+El IAR por departamento (`data/indice_redes.csv`) combina patrón regional (Ipsos) con noticias
+recientes. Señales usadas:
+
+- **Debate 31-may-2026**: Sánchez con mejor desempeño → momentum reciente a su favor.
+  [La República](https://larepublica.pe/politica/2026/05/31/debate-presidencial-2026-en-vivo-a-que-hora-y-por-donde-ver-el-keiko-fujimori-vs-roberto-sanchez-hnews-2425531) · [Infobae](https://www.infobae.com/peru/2026/05/31/debate-presidencial-2026-hoy-en-vivo-minuto-a-minuto-del-ultimo-cara-a-cara-de-keiko-fujimori-y-roberto-sanchez-este-31-de-mayo/)
+- **Antivoto/rechazo a Keiko** (~48%, marchas, colectivos): alta carga negativa en redes.
+  [Infobae — rechazo LGBTI](https://www.infobae.com/peru/2026/06/01/colectivo-lgbti-declara-su-rechazo-a-keiko-fujimori-en-segunda-vuelta-y-llama-a-un-voto-critico-y-vigilante/)
+- **Gira de cierre de Sánchez en el sur** (Arequipa 1-jun, Cusco 2-jun, Puno 3-jun "Cierre Sur Andino"):
+  refuerza su aceptación en el sur andino.
+  [Infobae — cierre de campaña](https://www.infobae.com/peru/2026/05/29/cierre-de-campana-de-roberto-sanchez-fecha-hora-y-lugar/) · [La República](https://larepublica.pe/politica/2026/05/29/roberto-sanchez-alista-cierre-de-campana-en-el-sur-del-pais-y-en-lima-hnews-2097744)
+- **Distribución regional** (Ipsos): Keiko fuerte en Lima/Callao y costa norte/oriente; Sánchez
+  domina sur andino y rural. [Infobae](https://www.infobae.com/peru/2026/05/31/ultima-encuesta-ipsos-keiko-fujimori-gana-en-lima-con-522-pero-roberto-sanchez-domina-el-peru-rural-con-539/)
+
+El `net` por departamento es juicio del autor a partir de esa evidencia (no medición directa de
+redes). El adaptador `data/social_signals.csv` permite sustituirlo por métricas reales de social
+listening. El IAR solo **rompe el voto indeciso** del departamento, acotado por su tamaño.
+
 ## Nota metodológica sobre la cola de partidos
 
 Los partidos menores (<3%) sin cruce de encuesta se clasificaron por **bloque ideológico**

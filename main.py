@@ -8,10 +8,11 @@ from pathlib import Path
 
 from src.cargar_datos import (cargar_primera_vuelta, cargar_transferencias,
                               cargar_vertientes, cargar_overrides, norm, FINALISTAS)
-from src.proyeccion import proyectar, hacer_resolver
+from src.proyeccion import proyectar, hacer_resolver, aplicar_indice
 from src.transferencia import ESCENARIOS
 from src.clasificacion import clasificar
 from src.reporte import construir_informe
+from src.indice_redes import cargar_indice, PESO_IAR
 
 RAIZ = Path(__file__).resolve().parent
 
@@ -58,6 +59,11 @@ def main():
     print("Proyectando segunda vuelta (3 escenarios)...")
     proyeccion = proyectar(pv, resolver)
 
+    indice = cargar_indice()
+    if indice:
+        print(f"  Índice de aceptación en redes: {len(indice)} departamento(s), peso={PESO_IAR}")
+        aplicar_indice(proyeccion, pv, indice, PESO_IAR)
+
     print("Clasificando departamentos (Ancla / Bisagra)...")
     clasif = clasificar(proyeccion, pv)
 
@@ -66,10 +72,12 @@ def main():
 
     resultados = {
         "finalistas": FINALISTAS,
+        "peso_iar": PESO_IAR,
         "nacional": proyeccion["nacional"],
         "departamentos": {
             d: {"proyeccion": proyeccion["departamentos"][d],
-                "clasificacion": clasif["por_departamento"][d]}
+                "clasificacion": clasif["por_departamento"][d],
+                "indice_redes": indice.get(norm(d), {})}
             for d in pv
         },
         "anclas": {
@@ -85,7 +93,8 @@ def main():
     print("  -> resultados.json")
 
     print("Generando informe.html...")
-    construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, RAIZ / "informe.html")
+    construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indice, PESO_IAR,
+                      RAIZ / "informe.html")
     print("  -> informe.html")
 
     nac = proyeccion["nacional"]["base"]

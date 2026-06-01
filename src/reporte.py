@@ -74,7 +74,7 @@ def _entrada(nombre, prj_esc, cat_key, peso, depto_norm, partidos, resolver):
     }
 
 
-def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, salida: Path):
+def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indice, peso_iar, salida: Path):
     nac = proyeccion["nacional"]
     base = nac["base"]
 
@@ -95,8 +95,15 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, sali
              "departamentos": {}}
     for depto, prj_esc in proyeccion["departamentos"].items():
         cl = clasif["por_departamento"][depto]
-        embed["departamentos"][norm(depto)] = _entrada(
-            depto, prj_esc, cl["categoria"], cl["peso"], norm(depto), pv[depto], resolver)
+        ent = _entrada(depto, prj_esc, cl["categoria"], cl["peso"], norm(depto), pv[depto], resolver)
+        ix = indice.get(norm(depto), {})
+        ent["net"] = ix.get("net", 0.0)
+        ent["iarK"] = ix.get("iar_keiko", 50); ent["iarS"] = ix.get("iar_sanchez", 50)
+        embed["departamentos"][norm(depto)] = ent
+    # Nacional ya ajustado por IAR (no se recalcula en vivo): se embebe precomputado
+    embed["nacional"]["escNac"] = {
+        e: {"k": nac[e]["pct_keiko"], "s": nac[e]["pct_sanchez"],
+            "margen": nac[e]["margen"], "ganador": nac[e]["ganador"]} for e in ESCENARIOS}
 
     bisagra_tbl = _tabla(
         ["#", "Departamento", "Votos válidos 1ra v.", "Margen base", "favK", "favS"],
@@ -116,6 +123,15 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, sali
         ["Partido (1ra vuelta)", "Bloque", "Favorece", "→Keiko", "→Sánchez", "→Blanco/Nulo", "Fuente"],
         filas_t)
 
+    iar_filas = sorted(
+        [(d, indice.get(norm(d), {})) for d in proyeccion["departamentos"]],
+        key=lambda x: x[1].get("net", 0))
+    iar_tbl = _tabla(
+        ["Departamento", "IAR Keiko", "IAR Sánchez", "Neto", "Cobertura", "Fuente"],
+        [[d, ix.get("iar_keiko", "—"), ix.get("iar_sanchez", "—"),
+          f"{ix.get('net', 0):+.2f}", ix.get("cobertura", "—"), ix.get("fuente", "")]
+         for d, ix in iar_filas])
+
     html = (_PLANTILLA
             .replace("__BASE_K__", f"{base['pct_keiko']:.1f}")
             .replace("__BASE_S__", f"{base['pct_sanchez']:.1f}")
@@ -124,6 +140,8 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, sali
             .replace("__N_BISAGRA__", str(len(clasif["bisagra"])))
             .replace("__BISAGRA_TBL__", bisagra_tbl)
             .replace("__TRANSF_TBL__", transf_tbl)
+            .replace("__IAR_TBL__", iar_tbl)
+            .replace("__PESOIAR__", str(peso_iar))
             .replace("__PLOTLYJS__", get_plotlyjs())
             .replace("__GEO__", json.dumps(geo, ensure_ascii=False))
             .replace("__DATA__", json.dumps(embed, ensure_ascii=False))
@@ -179,6 +197,12 @@ _PLANTILLA = r"""<!DOCTYPE html>
   .split { display:flex; height:8px; border-radius:3px; overflow:hidden; min-width:110px; margin-top:5px; }
   .split i { display:block; } .sk{background:#C2410C;} .ss{background:#B91C1C;} .sn{background:#d1d5db;}
   .hint { color:#9ca3af; font-size:.75rem; margin-top:10px; }
+  .iar { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:8px 10px; margin:8px 0 4px; }
+  .iar-hd { font-size:.82rem; }
+  .iar-net { color:#6b7280; margin-left:6px; }
+  .iar-sl { display:flex; align-items:center; gap:8px; margin-top:6px; font-size:.76rem; color:#374151; }
+  .iar-sl input[type=range] { flex:1; max-width:160px; }
+  .iar-hint { color:#9ca3af; }
   details { background:#fff; border:1px solid #e5e7eb; border-radius:10px; margin:0 12px 12px; }
   details > summary { padding:10px 14px; cursor:pointer; font-weight:600; font-size:.9rem; }
   details .body { padding:0 14px 14px; overflow:auto; }
@@ -217,6 +241,8 @@ _PLANTILLA = r"""<!DOCTYPE html>
   <div class="body">__BISAGRA_TBL__</div></details>
 <details><summary>Modelo de transferencia y vertientes (escenario base)</summary>
   <div class="body">__TRANSF_TBL__</div></details>
+<details><summary>Índice de Aceptación en Redes por departamento (IAR)</summary>
+  <div class="body">__IAR_TBL__</div></details>
 <div class="nota">Trasvase de los partidos mayores (Renovación Popular, Buen Gobierno, Obras,
 País para Todos, Ahora Nación) de cruces Ipsos may-2026; el resto, heurística por bloque. Ver FUENTES.md.</div>
 
@@ -231,6 +257,7 @@ const ESCN = {base:"Base", favK:"Favorable Keiko", favS:"Favorable Sánchez"};
 const ALPHA = 0.5, U_ANCLA = 10, U_BIS = 5;
 const fmt = n => (n==null?"—":Math.round(n).toLocaleString("es-PE"));
 const STATE = {}; let CUR = null;
+let PESO_IAR = __PESOIAR__;   // intensidad del Índice de Aceptación en Redes (slider)
 const clon = o => JSON.parse(JSON.stringify(o));
 const textoDark = lab => (lab.includes("Inclina")||lab==="Bisagra");
 
@@ -239,20 +266,26 @@ function entrada(key){
   if(!STATE[id]) STATE[id] = clon(key ? DATA.departamentos[key] : DATA.nacional);
   return STATE[id];
 }
-function calcEsc(parts){
+// Recalcula los 3 escenarios desde los shares de los partidos y aplica el IAR:
+// rompe fraccion·U del pool indeciso (U = peso − vk − vs) hacia el candidato favorecido.
+function calcEsc(d){
+  const net = d.net || 0, frac = Math.min(1, Math.max(0, PESO_IAR*Math.abs(net)));
   const tally = scn => {
     let vk=0, vs=0;
-    for(const p of parts){
+    for(const p of d.partidos){
       let k=p.k/100, s=p.s/100, n=Math.max(0,1-k-s);
       if(scn==="favK") k+=ALPHA*n; else if(scn==="favS") s+=ALPHA*n;
       vk+=p.votos*k; vs+=p.votos*s;
     }
+    const movidos = frac * Math.max(0, d.peso - vk - vs);
+    if(net>0) vk+=movidos; else if(net<0) vs+=movidos;
     const dos=(vk+vs)||1;
     return {k:+(vk/dos*100).toFixed(2), s:+(vs/dos*100).toFixed(2),
             margen:+((vk-vs)/dos*100).toFixed(2), ganador: vk>=vs?"keiko":"sanchez"};
   };
   return {base:tally("base"), favK:tally("favK"), favS:tally("favS")};
 }
+const escDe = (d, key) => key ? calcEsc(d) : d.escNac;
 function calcCat(esc){
   const g=new Set([esc.base.ganador,esc.favK.ganador,esc.favS.ganador]);
   const m=esc.base.margen, w=esc.base.ganador;
@@ -346,7 +379,7 @@ function chart(esc){
       margin:{l:34,r:8,t:8,b:22}, legend:{orientation:"h",y:1.15}, font:{size:11}}, MAP_CFG);
 }
 function refrescar(){
-  const d = entrada(CUR), esc = calcEsc(d.partidos), b = esc.base;
+  const d = entrada(CUR), esc = calcEsc(d), b = esc.base;
   document.querySelector(".res .b.k .big").textContent = b.k+"%";
   document.querySelector(".res .b.s .big").textContent = b.s+"%";
   const gan = b.ganador==="keiko"?"Keiko":"Sánchez";
@@ -395,13 +428,22 @@ function restablecer(){ if(CUR){ delete STATE[CUR]; render(CUR); } }
 
 function render(key){
   CUR = key || null;
-  const d = entrada(key), esc = calcEsc(d.partidos), b = esc.base;
+  const d = entrada(key), esc = escDe(d, key), b = esc.base;
   const catKey = key ? calcCat(esc) : null;
   const gan = b.ganador==="keiko" ? "Keiko" : "Sánchez";
   const toolbar = key ? `<div class="toolbar">
       <span class="lbl">Afinar reparto de este departamento</span>
       <button onclick="restablecer()">Restablecer</button>
       <button onclick="exportar()">Exportar ajustes CSV</button></div>` : "";
+  const netTxt = !key ? "" : (d.net>0 ? "favorece a Keiko" : d.net<0 ? "favorece a Sánchez" : "neutro");
+  const iarBlock = key ? `<div class="iar">
+      <div class="iar-hd">Aceptación en redes (IAR):
+        <b style="color:#C2410C">Keiko ${d.iarK}</b> · <b style="color:#B91C1C">Sánchez ${d.iarS}</b>
+        <span class="iar-net">${netTxt} (neto ${d.net>0?'+':''}${Math.round(d.net*100)})</span></div>
+      <div class="iar-sl"><label>Peso del IAR: <b id="pesoval">${PESO_IAR.toFixed(2)}</b></label>
+        <input type="range" id="pesoiar" min="0" max="1" step="0.05" value="${PESO_IAR}">
+        <span class="iar-hint">0 = ignorar redes · rompe el voto indeciso hacia quien tiene mejor aceptación</span></div>
+    </div>` : "";
 
   document.getElementById("panel").innerHTML = `
     <h2 class="pnl-title">${d.nombre} ${badgeHTML(catKey)}</h2>
@@ -411,6 +453,7 @@ function render(key){
       <div class="b s"><div class="big">${b.s}%</div><div class="lbl">Sánchez (JxP)</div></div>
     </div>
     <div id="panel-chart"></div>
+    ${iarBlock}
     <div style="font-weight:600;font-size:.85rem;margin:6px 0 2px">¿De dónde viene cada voto?
       ${key ? '<span style="font-weight:400;color:#6b7280">— mueve los % para afinar</span>' : '(escenario base)'}</div>
     ${toolbar}
@@ -422,6 +465,9 @@ function render(key){
     document.getElementById("volver").style.cursor="pointer";
     document.getElementById("volver").onclick=()=>render(null);
     document.querySelectorAll("#panel input.pct").forEach(inp=>inp.addEventListener("input",()=>onEdit(inp)));
+    const sl=document.getElementById("pesoiar");
+    sl.addEventListener("input", ()=>{ PESO_IAR=+sl.value;
+      document.getElementById("pesoval").textContent=PESO_IAR.toFixed(2); refrescar(); });
     mapaDepto(key, catKey);
   } else {
     mapaNacional();

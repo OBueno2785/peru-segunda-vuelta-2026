@@ -31,7 +31,12 @@ mueve el voto de los partidos eliminados, para responder cuatro preguntas:
    rompe el voto indeciso/blanco (la mitad se inclina al candidato favorecido). Transparente
    y conservador.
 6. **Proyección** — por departamento y escenario: `votos = Σ partido × % trasvase`.
-7. **Clasificación**:
+7. **Índice de Aceptación en Redes (IAR)** — señal de noticias/redes por departamento
+   (`data/indice_redes.csv`, snapshot; `data/social_signals.csv` opcional). El IAR **rompe el
+   voto indeciso** del departamento hacia el candidato con mejor aceptación, **acotado por el
+   tamaño del pool de indecisos** (no inventa votos). Intensidad con peso configurable (`PESO_IAR`,
+   def. 0.5; slider en el dashboard). Ver [`FUENTES.md`](FUENTES.md).
+8. **Clasificación**:
    - **Ancla (de un candidato)**: gana en los 3 escenarios con margen base ≥ 10 pts.
    - **Bisagra**: el ganador cambia entre escenarios, o el margen base es < 5 pts.
    - **Inclina**: ganador estable con margen base entre 5 y 10 pts.
@@ -60,17 +65,21 @@ Genera dos salidas en la raíz:
 - **Afinado en vivo** — en el panel del departamento puedes editar el reparto →Keiko/→Sánchez
   de cada partido eliminado; las tarjetas, los escenarios, la categoría y el color del mapa
   se recalculan al instante. La base de los finalistas queda fija ("base fija").
+- **Índice de Aceptación en Redes** — el panel del departamento muestra el IAR (Keiko vs
+  Sánchez) y un **slider de peso** que rompe el voto indeciso según las redes y recalcula todo
+  en vivo (peso 0 = modelo puro).
 - **Exportar ajustes CSV** — descarga tus cambios en el formato de `overrides_departamento.csv`
   para pegarlos en `data/` y volverlos permanentes. **Restablecer** vuelve al modelo.
 
 ## Estructura
 
 ```
-data/      snapshot 1ra vuelta, GeoJSON, vertientes, matriz de transferencia
-           y overrides_departamento.csv (ajustes locales, opcional)
-src/       carga, transferencia, proyección, clasificación, reporte
+data/      snapshot 1ra vuelta, GeoJSON, vertientes, matriz de transferencia,
+           overrides_departamento.csv (ajustes locales) e indice_redes.csv (IAR);
+           social_signals.csv opcional (adaptador de redes)
+src/       carga, transferencia, proyección, clasificación, índice de redes, reporte
 main.py    pipeline completo + chequeos de integridad
-FUENTES.md encuestas, endosos y notas metodológicas (con URLs)
+FUENTES.md encuestas, endosos, IAR y notas metodológicas (con URLs)
 ```
 
 ## Limitaciones
@@ -80,4 +89,7 @@ FUENTES.md encuestas, endosos y notas metodológicas (con URLs)
 - Salvo Lima, no hay encuestas departamentales de 2da vuelta: por defecto el trasvase es
   uniforme y la heterogeneidad geográfica proviene del **mix de partidos de 1ra vuelta de cada
   departamento** (dato duro). Los overrides permiten introducir idiosincrasia local conocida.
+- El **IAR es un proxy de noticias** (snapshot fechado) + adaptador social opcional; no es
+  escucha en vivo de X/Meta. El sentimiento es heurístico; reemplazable por datos medidos vía
+  `social_signals.csv`.
 - Datos de encuestas posteriores a abril-2026; sujetos a revisión si ONPE/encuestadoras actualizan.

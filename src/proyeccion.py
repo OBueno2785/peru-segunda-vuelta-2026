@@ -60,6 +60,10 @@ def proyectar(pv: dict, resolver) -> dict:
         por_depto[depto] = {esc: proyectar_departamento(dn, partidos, resolver, esc)
                             for esc in ESCENARIOS}
 
+    return {"departamentos": por_depto, "nacional": _agregar_nacional(por_depto)}
+
+
+def _agregar_nacional(por_depto: dict) -> dict:
     nacional = {}
     for esc in ESCENARIOS:
         vk = sum(por_depto[d][esc]["votos_keiko"] for d in por_depto)
@@ -72,4 +76,29 @@ def proyectar(pv: dict, resolver) -> dict:
             "margen": round((vk - vs) / dos * 100, 2) if dos else 0.0,
             "ganador": "keiko" if vk >= vs else "sanchez",
         }
-    return {"departamentos": por_depto, "nacional": nacional}
+    return nacional
+
+
+def aplicar_indice(proyeccion: dict, pv: dict, indice: dict, peso: float) -> None:
+    """Rompe el voto indeciso de cada departamento según el IAR (in-place).
+
+    En cada escenario: U = total_válidos − vk − vs (pool indeciso). Se mueve
+    fraccion = clamp(peso·|net|,0,1) de ese pool al candidato con mejor aceptación.
+    Nunca mueve más que U. Guarda 'margen_modelo' para referencia.
+    """
+    for depto, escs in proyeccion["departamentos"].items():
+        total = sum(p["votos"] for p in pv[depto].values())
+        net = indice.get(norm(depto), {}).get("net", 0.0)
+        frac = min(1.0, max(0.0, peso * abs(net)))
+        for pr in escs.values():
+            vk, vs = pr["votos_keiko"], pr["votos_sanchez"]
+            movidos = frac * max(0, total - vk - vs)
+            pr["margen_modelo"] = pr["margen"]
+            if net > 0: vk += movidos
+            elif net < 0: vs += movidos
+            dos = (vk + vs) or 1
+            pr.update(votos_keiko=round(vk), votos_sanchez=round(vs),
+                      pct_keiko=round(vk / dos * 100, 2), pct_sanchez=round(vs / dos * 100, 2),
+                      margen=round((vk - vs) / dos * 100, 2),
+                      ganador="keiko" if vk >= vs else "sanchez")
+    proyeccion["nacional"] = _agregar_nacional(proyeccion["departamentos"])
