@@ -1,0 +1,8 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Salidas generadas (se regeneran con `python main.py`)
+informe.html
+resultados.json
