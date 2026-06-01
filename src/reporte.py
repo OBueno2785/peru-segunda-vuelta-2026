@@ -130,8 +130,8 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indi
     embed["nacional"]["iarS"] = round(50 - net_nac * 50)
 
     bisagra_tbl = _tabla(
-        ["#", "Departamento", "Votos válidos 1ra v.", "Margen base", "favK", "favS"],
-        [[i + 1, d["departamento"], f"{d['peso']:,}", f"{d['margen_base']:+.1f}",
+        ["#", "Departamento", "Margen proyectado", "favK", "favS"],
+        [[i + 1, d["departamento"], f"{d['margen_base']:+.1f}",
           f"{d['margenes']['favK']:+.1f}", f"{d['margenes']['favS']:+.1f}"]
          for i, d in enumerate(clasif["bisagra"])])
 
@@ -144,7 +144,7 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indi
                         f"{t['keiko']*100:.0f}%", f"{t['sanchez']*100:.0f}%",
                         f"{t['null']*100:.0f}%", t["fuente"]])
     transf_tbl = _tabla(
-        ["Partido (1ra vuelta)", "Bloque", "Favorece", "→Keiko", "→Sánchez", "→Blanco/Nulo", "Fuente"],
+        ["Partido", "Bloque", "Favorece", "→Keiko", "→Sánchez", "→Blanco/Nulo", "Fuente"],
         filas_t)
 
     iar_filas = sorted(
@@ -426,12 +426,12 @@ function tablaPartidos(parts, editable){
     } else {
       celda = `<td style="text-align:center">${splitBar}</td>`;
     }
-    return `<tr><td>${p.partido}${mk}${baseTag}</td><td>${fmt(p.votos)}</td>${celda}
+    return `<tr><td>${p.partido}${mk}${baseTag}</td>${celda}
             <td id="ak${i}">${fmt(p.aporteK)}</td><td id="as${i}">${fmt(p.aporteS)}</td></tr>`;
   }).join("");
-  if(hayOv) rows += `<tr><td colspan="5" style="color:#2563eb;font-size:.72rem;border:0">▲ trasvase ajustado a la idiosincrasia de este departamento</td></tr>`;
+  if(hayOv) rows += `<tr><td colspan="4" style="color:#2563eb;font-size:.72rem;border:0">▲ trasvase ajustado a la idiosincrasia de este departamento</td></tr>`;
   const cab = editable ? "Reparto del voto (editable)" : "→K / →S / →Nulo";
-  return `<table class="ptbl"><thead><tr><th>Partido (1ra v.)</th><th>Votos</th>
+  return `<table class="ptbl"><thead><tr><th>Partido</th>
           <th style="text-align:left">${cab}</th><th>→ Keiko</th><th>→ Sánchez</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 function chart(esc){
@@ -448,7 +448,7 @@ function refrescar(){
   const d = entrada(CUR), esc = calcEsc(d), b = esc.base;
   const ck = CUR ? calcCat(esc) : null;
   document.getElementById("sub").textContent =
-    `Votos válidos 1ra vuelta: ${fmt(d.peso)} · escenario base`;
+    "Proyección de segunda vuelta · escenario base";
   pintarResultado(b, CUR, ck);
   if(CUR){ const lab=CATLABEL[ck], bd=document.getElementById("badge");
            bd.textContent=lab; bd.style.background=CATCOLOR[lab]; bd.style.color=textoDark(lab)?"#1f2937":"#fff";
@@ -520,7 +520,7 @@ function render(key){
 
   document.getElementById("panel").innerHTML = `
     <h2 class="pnl-title">${d.nombre} ${badgeHTML(catKey)}</h2>
-    <div class="pnl-sub" id="sub">Votos válidos 1ra vuelta: ${fmt(d.peso)} · gana ${gan} (base) · margen ${b.margen>=0?"+":""}${b.margen} pts</div>
+    <div class="pnl-sub" id="sub">Proyección de segunda vuelta · escenario base</div>
     <div class="takeaway" id="takeaway"></div>
     <div class="tug">
       <div class="tug-bar"><div class="tug-seg k" id="tug-k"></div><div class="tug-seg s" id="tug-s"></div><div class="tug-50"></div></div>
