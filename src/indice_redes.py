@@ -9,7 +9,7 @@ from pathlib import Path
 
 from src.cargar_datos import DATA_DIR, norm
 
-PESO_IAR = 0.5  # intensidad por defecto (0 = ignorar redes, 1 = romper todo el indeciso)
+PESO_IAR = 1.0  # intensidad por defecto (0 = ignorar redes, 1 = romper el indeciso según |net|)
 
 
 def cargar_social() -> dict:
