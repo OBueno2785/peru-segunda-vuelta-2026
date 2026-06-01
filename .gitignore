@@ -6,3 +6,7 @@ __pycache__/
 # Salidas generadas (se regeneran con `python main.py`)
 informe.html
 resultados.json
+
+# Preview local
+index.html
+.claude/

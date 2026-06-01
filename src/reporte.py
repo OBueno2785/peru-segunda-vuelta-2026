@@ -1,12 +1,18 @@
-"""Genera informe.html autocontenido: mapa Ancla/Bisagra + tablas + escenarios."""
+"""Genera informe.html: dashboard interactivo (mapa + panel por departamento) autocontenido.
+
+El mapa y los gráficos se dibujan en el navegador con Plotly (embebido inline). Al
+seleccionar un departamento el mapa se enfoca en su forma; los % de trasvase son
+editables por departamento y todo se recalcula en vivo.
+"""
 import json
 from pathlib import Path
 
-import plotly.express as px
-import plotly.graph_objects as go
-import plotly.io as pio
+from plotly.offline import get_plotlyjs
 
-from src.cargar_datos import DATA_DIR, norm
+from src.cargar_datos import DATA_DIR, norm, FINALISTAS
+from src.transferencia import ESCENARIOS, shares
+
+_FINAL_NORM = {norm(p) for p in FINALISTAS}
 
 CAT_LABEL = {
     "ancla_keiko": "Ancla Keiko", "inclina_keiko": "Inclina Keiko",
@@ -17,188 +23,412 @@ CAT_COLOR = {
     "Ancla Keiko": "#C2410C", "Inclina Keiko": "#FDBA74",
     "Bisagra": "#FCD34D", "Inclina Sánchez": "#FCA5A5", "Ancla Sánchez": "#B91C1C",
 }
-ESC_LABEL = {"base": "Base", "favK": "Favorable Keiko", "favS": "Favorable Sánchez"}
 
 
-def _mapa(clasif: dict) -> str:
+def _tabla(headers, filas) -> str:
+    th = "".join(f"<th>{h}</th>" for h in headers)
+    trs = "".join("<tr>" + "".join(f"<td>{c}</td>" for c in fila) + "</tr>" for fila in filas)
+    return f"<table class='full'><thead><tr>{th}</tr></thead><tbody>{trs}</tbody></table>"
+
+
+def _fmt_g(g):
+    return "Keiko" if g == "keiko" else "Sánchez"
+
+
+def _detalle_partidos(depto_norm, partidos: dict, resolver, top: int = 10) -> list:
+    """Lista por partido con trasvase RESUELTO para el departamento (incluye overrides)."""
+    filas = []
+    for pnorm, info in partidos.items():
+        t = resolver(depto_norm, pnorm)
+        k, s = shares(t, "base")
+        v = info["votos"]
+        es_base = pnorm in _FINAL_NORM   # FP→Keiko, JxP→Sánchez: base propia, no se ajusta
+        filas.append({
+            "partido": info["partido"], "bloque": t["bloque"], "votos": v,
+            "k": round(k * 100, 1), "s": round(s * 100, 1),
+            "n": round(max(0.0, 1 - k - s) * 100, 1),
+            "aporteK": round(v * k), "aporteS": round(v * s),
+            "override": t.get("fuente", "").startswith("override"),
+            "editable": not es_base, "base": es_base,
+        })
+    filas.sort(key=lambda x: -x["votos"])
+    if len(filas) > top:
+        resto = filas[top:]
+        vr = sum(r["votos"] for r in resto) or 1
+        ak = sum(r["aporteK"] for r in resto); as_ = sum(r["aporteS"] for r in resto)
+        filas = filas[:top] + [{
+            "partido": f"+{len(resto)} partidos menores", "bloque": "otros",
+            "votos": vr, "k": round(ak / vr * 100, 1), "s": round(as_ / vr * 100, 1),
+            "n": round(max(0.0, 1 - ak / vr - as_ / vr) * 100, 1),
+            "aporteK": ak, "aporteS": as_, "override": False, "editable": False, "base": False,
+        }]
+    return filas
+
+
+def _entrada(nombre, prj_esc, cat_key, peso, depto_norm, partidos, resolver):
+    return {
+        "nombre": nombre,
+        "catKey": cat_key,
+        "peso": peso,
+        "partidos": _detalle_partidos(depto_norm, partidos, resolver),
+    }
+
+
+def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, salida: Path):
+    nac = proyeccion["nacional"]
+    base = nac["base"]
+
+    # GeoJSON con clave normalizada para casar con las ubicaciones del mapa
     geo = json.loads((DATA_DIR / "peru-departamentos.geojson").read_text(encoding="utf-8"))
     for f in geo["features"]:
         f["properties"]["KEY"] = norm(f["properties"]["NOMBDEP"])
 
-    deptos = clasif["por_departamento"]
-    keys, cats, texto = [], [], []
-    for depto, v in deptos.items():
-        keys.append(norm(depto))
-        cats.append(CAT_LABEL[v["categoria"]])
-        g = "Keiko" if v["ganador_base"] == "keiko" else "Sánchez"
-        texto.append(f"<b>{depto}</b><br>Gana (base): {g}<br>"
-                     f"Margen base: {v['margen_base']:+.1f} pts<br>Votos válidos 1ra v.: {v['peso']:,}")
+    # Datos embebidos para el panel + mapa interactivos
+    nac_part = {}
+    for parts in pv.values():
+        for pn, info in parts.items():
+            d = nac_part.setdefault(pn, {"partido": info["partido"], "votos": 0})
+            d["votos"] += info["votos"]
 
-    fig = px.choropleth(
-        geojson=geo, locations=keys, featureidkey="properties.KEY",
-        color=cats, color_discrete_map=CAT_COLOR,
-        category_orders={"color": list(CAT_COLOR)},
-    )
-    fig.update_traces(customdata=texto, hovertemplate="%{customdata}<extra></extra>")
-    fig.update_geos(fitbounds="locations", visible=False)
-    fig.update_layout(
-        title="Mapa de segunda vuelta: departamentos Ancla y Bisagra",
-        legend_title_text="Categoría", margin=dict(l=0, r=0, t=40, b=0), height=600,
-    )
-    return pio.to_html(fig, full_html=False, include_plotlyjs="cdn")
+    embed = {"nacional": _entrada("PERÚ — proyección nacional", nac, None,
+                                  sum(p["votos"] for p in nac_part.values()), None, nac_part, resolver),
+             "departamentos": {}}
+    for depto, prj_esc in proyeccion["departamentos"].items():
+        cl = clasif["por_departamento"][depto]
+        embed["departamentos"][norm(depto)] = _entrada(
+            depto, prj_esc, cl["categoria"], cl["peso"], norm(depto), pv[depto], resolver)
 
-
-def _barras_nacional(nacional: dict) -> str:
-    escs = list(ESC_LABEL)
-    fig = go.Figure()
-    fig.add_bar(name="Keiko (FP)", x=[ESC_LABEL[e] for e in escs],
-                y=[nacional[e]["pct_keiko"] for e in escs], marker_color="#C2410C",
-                text=[f"{nacional[e]['pct_keiko']:.1f}%" for e in escs], textposition="outside")
-    fig.add_bar(name="Sánchez (JxP)", x=[ESC_LABEL[e] for e in escs],
-                y=[nacional[e]["pct_sanchez"] for e in escs], marker_color="#B91C1C",
-                text=[f"{nacional[e]['pct_sanchez']:.1f}%" for e in escs], textposition="outside")
-    fig.update_layout(title="Proyección nacional por escenario (voto válido entre los dos)",
-                      barmode="group", yaxis_range=[0, 70], height=400,
-                      margin=dict(l=40, r=20, t=50, b=30))
-    return pio.to_html(fig, full_html=False, include_plotlyjs=False)
-
-
-def _tabla(headers, filas, clases=None) -> str:
-    th = "".join(f"<th>{h}</th>" for h in headers)
-    trs = []
-    for fila in filas:
-        tds = "".join(f"<td>{c}</td>" for c in fila)
-        trs.append(f"<tr>{tds}</tr>")
-    return f"<table><thead><tr>{th}</tr></thead><tbody>{''.join(trs)}</tbody></table>"
-
-
-def _fmt_ganador(g):
-    return "Keiko" if g == "keiko" else "Sánchez"
-
-
-def construir_informe(proyeccion, clasif, pv, transf, vertientes, salida: Path):
-    nac = proyeccion["nacional"]
-    base = nac["base"]
-    ganador_nac = _fmt_ganador(base["ganador"])
-
-    mapa_html = _mapa(clasif)
-    barras_html = _barras_nacional(nac)
-
-    # Resumen de categorías
-    resumen = _tabla(
-        ["Categoría", "N° deptos", "Departamentos"],
-        [
-            ["Ancla Keiko", len(clasif["ancla_keiko"]),
-             ", ".join(d["departamento"] for d in clasif["ancla_keiko"]) or "—"],
-            ["Inclina Keiko", len(clasif["inclina_keiko"]),
-             ", ".join(d["departamento"] for d in clasif["inclina_keiko"]) or "—"],
-            ["Bisagra", len(clasif["bisagra"]),
-             ", ".join(d["departamento"] for d in clasif["bisagra"]) or "—"],
-            ["Inclina Sánchez", len(clasif["inclina_sanchez"]),
-             ", ".join(d["departamento"] for d in clasif["inclina_sanchez"]) or "—"],
-            ["Ancla Sánchez", len(clasif["ancla_sanchez"]),
-             ", ".join(d["departamento"] for d in clasif["ancla_sanchez"]) or "—"],
-        ],
-    )
-
-    # Ranking de bisagra por peso electoral
-    bisagra = _tabla(
-        ["#", "Departamento", "Votos válidos 1ra v.", "Margen base", "Margen favK", "Margen favS"],
+    bisagra_tbl = _tabla(
+        ["#", "Departamento", "Votos válidos 1ra v.", "Margen base", "favK", "favS"],
         [[i + 1, d["departamento"], f"{d['peso']:,}", f"{d['margen_base']:+.1f}",
           f"{d['margenes']['favK']:+.1f}", f"{d['margenes']['favS']:+.1f}"]
-         for i, d in enumerate(clasif["bisagra"])],
-    )
+         for i, d in enumerate(clasif["bisagra"])])
 
-    # Tabla por departamento (ordenada por margen base, de más Sánchez a más Keiko)
-    deptos_ord = sorted(clasif["por_departamento"].items(), key=lambda kv: kv[1]["margen_base"])
-    detalle = _tabla(
-        ["Departamento", "Gana (base)", "Margen base", "Categoría", "Votos válidos 1ra v."],
-        [[d, _fmt_ganador(v["ganador_base"]), f"{v['margen_base']:+.1f}",
-          CAT_LABEL[v["categoria"]], f"{v['peso']:,}"] for d, v in deptos_ord],
-    )
-
-    # Tabla de transferencia / vertientes (ordenada por trasvase neto a Keiko)
     filas_t = []
     for t in sorted(transf.values(), key=lambda x: -(x["keiko"] - x["sanchez"])):
         if t["fuente"] == "finalista":
             continue
-        favorece = vertientes.get(t["bloque"], {}).get("favorece", "—")
-        filas_t.append([t["partido"], t["bloque"], favorece,
+        filas_t.append([t["partido"], t["bloque"],
+                        vertientes.get(t["bloque"], {}).get("favorece", "—"),
                         f"{t['keiko']*100:.0f}%", f"{t['sanchez']*100:.0f}%",
                         f"{t['null']*100:.0f}%", t["fuente"]])
-    transf_html = _tabla(
-        ["Partido (1ra vuelta)", "Bloque", "Favorece", "→ Keiko", "→ Sánchez", "→ Blanco/Nulo", "Fuente"],
-        filas_t,
-    )
+    transf_tbl = _tabla(
+        ["Partido (1ra vuelta)", "Bloque", "Favorece", "→Keiko", "→Sánchez", "→Blanco/Nulo", "Fuente"],
+        filas_t)
 
-    html = f"""<!DOCTYPE html>
-<html lang="es"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Segunda Vuelta Perú 2026 — Keiko Fujimori vs Roberto Sánchez</title>
-<style>
-  body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:#1f2937;
-         max-width: 1100px; margin: 0 auto; padding: 24px; line-height: 1.5; }}
-  h1 {{ font-size: 1.7rem; margin-bottom: 0; }}
-  h2 {{ margin-top: 2.2rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 4px; }}
-  .sub {{ color:#6b7280; margin-top: 4px; }}
-  .cards {{ display:flex; gap:16px; flex-wrap:wrap; margin: 16px 0; }}
-  .card {{ flex:1; min-width:220px; border-radius:12px; padding:16px; color:#fff; }}
-  .k {{ background:#C2410C; }} .s {{ background:#B91C1C; }}
-  .card .big {{ font-size:2rem; font-weight:700; }}
-  table {{ border-collapse: collapse; width:100%; margin:12px 0; font-size:0.9rem; }}
-  th, td {{ border:1px solid #e5e7eb; padding:6px 10px; text-align:left; }}
-  th {{ background:#f9fafb; }}
-  td:nth-child(n+3) {{ font-variant-numeric: tabular-nums; }}
-  .nota {{ background:#fffbeb; border-left:4px solid #f59e0b; padding:10px 14px; border-radius:6px;
-          font-size:0.9rem; color:#92400e; }}
-  footer {{ margin-top:3rem; color:#9ca3af; font-size:0.8rem; }}
-</style></head><body>
-
-<h1>Segunda Vuelta Presidencial — Perú 2026</h1>
-<p class="sub">Keiko Fujimori (Fuerza Popular) vs Roberto Sánchez (Juntos por el Perú) · Balotaje del 7 de junio de 2026</p>
-
-<p>Proyección departamental construida sobre el resultado de 1ra vuelta de ONPE y un modelo de
-transferencia de votos de los partidos eliminados (cruces Ipsos mayo-2026 + heurística por bloque
-ideológico), evaluado en tres escenarios. <strong>No es un pronóstico cerrado</strong>: identifica
-quién parte con ventaja y dónde se define la elección.</p>
-
-<div class="cards">
-  <div class="card k"><div>Keiko Fujimori — escenario base</div>
-    <div class="big">{base['pct_keiko']:.1f}%</div><div>{base['votos_keiko']:,} votos proyectados</div></div>
-  <div class="card s"><div>Roberto Sánchez — escenario base</div>
-    <div class="big">{base['pct_sanchez']:.1f}%</div><div>{base['votos_sanchez']:,} votos proyectados</div></div>
-</div>
-<p><strong>Ganador nacional (escenario base):</strong> {ganador_nac} · margen {base['margen']:+.1f} pts
-(voto válido entre los dos candidatos).</p>
-
-<h2>Proyección nacional por escenario</h2>
-{barras_html}
-
-<h2>Mapa: departamentos Ancla y Bisagra</h2>
-<p class="sub"><b>Ancla</b>: el candidato gana en los 3 escenarios con ≥10 pts. <b>Bisagra</b>: el ganador
-cambia entre escenarios o el margen base es &lt;5 pts. Naranja = Keiko, rojo = Sánchez, amarillo = bisagra.</p>
-{mapa_html}
-
-<h2>Resumen por categoría</h2>
-{resumen}
-
-<h2>Departamentos bisagra (ordenados por peso electoral)</h2>
-<p class="sub">Donde se define la elección: el ranking prioriza los de mayor cantidad de votos.</p>
-{bisagra}
-
-<h2>Detalle por departamento</h2>
-{detalle}
-
-<h2>Modelo de transferencia y vertientes</h2>
-<p class="sub">Cómo se reparte el voto de cada partido eliminado en el escenario base. "Favorece"
-indica la inclinación del bloque ideológico.</p>
-{transf_html}
-
-<div class="nota">El trasvase es el supuesto más sensible. Los % de Renovación Popular, Buen Gobierno,
-Obras, País para Todos y Ahora Nación provienen de cruces de Ipsos (mayo 2026); el resto usa
-heurística por bloque. Ver <code>FUENTES.md</code>.</div>
-
-<footer>Generado por el pipeline de <code>peru-segunda-vuelta-2026</code>. Datos base: ONPE 1ra vuelta.</footer>
-</body></html>"""
+    html = (_PLANTILLA
+            .replace("__BASE_K__", f"{base['pct_keiko']:.1f}")
+            .replace("__BASE_S__", f"{base['pct_sanchez']:.1f}")
+            .replace("__GANADOR__", _fmt_g(base["ganador"]))
+            .replace("__MARGEN__", f"{abs(base['margen']):.1f}")
+            .replace("__N_BISAGRA__", str(len(clasif["bisagra"])))
+            .replace("__BISAGRA_TBL__", bisagra_tbl)
+            .replace("__TRANSF_TBL__", transf_tbl)
+            .replace("__PLOTLYJS__", get_plotlyjs())
+            .replace("__GEO__", json.dumps(geo, ensure_ascii=False))
+            .replace("__DATA__", json.dumps(embed, ensure_ascii=False))
+            .replace("__CATCOLOR__", json.dumps(CAT_COLOR, ensure_ascii=False)))
 
     salida.write_text(html, encoding="utf-8")
+
+
+_PLANTILLA = r"""<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Segunda Vuelta Perú 2026 — Keiko vs Sánchez</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:#1f2937; margin:0; background:#f3f4f6; }
+  header { background:#fff; border-bottom:1px solid #e5e7eb; padding:10px 18px;
+           display:flex; align-items:center; gap:18px; flex-wrap:wrap; position:sticky; top:0; z-index:5; }
+  header h1 { font-size:1.05rem; margin:0; white-space:nowrap; }
+  header .sub { color:#6b7280; font-size:.78rem; }
+  .chips { margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .chip { font-size:.8rem; padding:4px 10px; border-radius:999px; color:#fff; font-weight:600; }
+  .chip.k { background:#C2410C; } .chip.s { background:#B91C1C; } .chip.meta { background:#374151; }
+  .wrap { display:grid; grid-template-columns: 1fr minmax(360px, 460px); gap:12px; padding:12px; height: calc(100vh - 52px); }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; display:flex; flex-direction:column; }
+  .card > .hd { padding:8px 12px; border-bottom:1px solid #f0f0f0; font-weight:600; font-size:.88rem; display:flex; gap:8px; align-items:center; }
+  .card > .hd button { margin-left:auto; font-size:.72rem; padding:3px 8px; border:1px solid #d1d5db; border-radius:6px; background:#fff; cursor:pointer; }
+  #mapa { flex:1; min-height:0; }
+  #panel { padding:12px; overflow:auto; }
+  .pnl-title { display:flex; align-items:center; gap:8px; margin:0 0 2px; font-size:1.1rem; }
+  .badge { font-size:.72rem; padding:2px 8px; border-radius:6px; font-weight:600; }
+  .pnl-sub { color:#6b7280; font-size:.8rem; margin-bottom:10px; }
+  .res { display:flex; gap:10px; margin:8px 0 4px; }
+  .res .b { flex:1; border-radius:8px; padding:8px 10px; color:#fff; }
+  .res .b.k { background:#C2410C; } .res .b.s { background:#B91C1C; }
+  .res .b .big { font-size:1.45rem; font-weight:700; line-height:1; }
+  .res .b .lbl { font-size:.72rem; opacity:.9; }
+  #panel-chart { height:230px; margin:6px 0 4px; }
+  .toolbar { display:flex; align-items:center; gap:8px; margin:10px 0 4px; flex-wrap:wrap; }
+  .toolbar .lbl { font-weight:600; font-size:.85rem; margin-right:auto; }
+  .toolbar button { font-size:.75rem; padding:4px 9px; border:1px solid #d1d5db; border-radius:6px; background:#fff; cursor:pointer; }
+  .toolbar button:hover { background:#f3f4f6; }
+  .ptbl { width:100%; border-collapse:collapse; font-size:.78rem; }
+  .ptbl th, .ptbl td { padding:5px 6px; border-bottom:1px solid #f0f0f0; text-align:right; vertical-align:middle; }
+  .ptbl th:first-child, .ptbl td:first-child { text-align:left; }
+  .ptbl th { color:#6b7280; font-weight:600; }
+  .ptbl td.edit { text-align:left; min-width:210px; }
+  .kswrap { display:flex; align-items:center; gap:4px; font-size:.76rem; }
+  .kswrap .kl { color:#C2410C; font-weight:700; } .kswrap .sl { color:#B91C1C; font-weight:700; margin-left:8px; }
+  .kswrap .nulo { color:#9ca3af; margin-left:auto; }
+  .ptbl input.pct { width:44px; padding:3px 5px; border:1px solid #d1d5db; border-radius:5px; font-size:.78rem; text-align:right; }
+  .ptbl input.pct:focus { outline:none; border-color:#2563eb; }
+  .ptbl input.pct.edited { border-color:#2563eb; background:#eff6ff; }
+  .split { display:flex; height:8px; border-radius:3px; overflow:hidden; min-width:110px; margin-top:5px; }
+  .split i { display:block; } .sk{background:#C2410C;} .ss{background:#B91C1C;} .sn{background:#d1d5db;}
+  .hint { color:#9ca3af; font-size:.75rem; margin-top:10px; }
+  details { background:#fff; border:1px solid #e5e7eb; border-radius:10px; margin:0 12px 12px; }
+  details > summary { padding:10px 14px; cursor:pointer; font-weight:600; font-size:.9rem; }
+  details .body { padding:0 14px 14px; overflow:auto; }
+  table.full { border-collapse:collapse; width:100%; font-size:.82rem; }
+  table.full th, table.full td { border:1px solid #e5e7eb; padding:5px 9px; text-align:left; }
+  table.full th { background:#f9fafb; position:sticky; top:0; }
+  .nota { background:#fffbeb; border-left:4px solid #f59e0b; padding:8px 12px; border-radius:6px; font-size:.82rem; color:#92400e; margin:0 12px 14px; }
+  @media (max-width:860px){ .wrap{ grid-template-columns:1fr; height:auto; } #mapa{ height:58vh; } }
+</style>
+<script>__PLOTLYJS__</script>
+</head><body>
+
+<header>
+  <div>
+    <h1>Segunda Vuelta Presidencial — Perú 2026</h1>
+    <div class="sub">Keiko Fujimori (FP) vs Roberto Sánchez (JxP) · balotaje 7-jun-2026</div>
+  </div>
+  <div class="chips">
+    <span class="chip k">Keiko __BASE_K__%</span>
+    <span class="chip s">Sánchez __BASE_S__%</span>
+    <span class="chip meta">Gana __GANADOR__ · +__MARGEN__ pts (base)</span>
+    <span class="chip meta">__N_BISAGRA__ bisagra</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <div class="hd"><span id="map-hd">Mapa nacional · clic en un departamento</span>
+      <button id="map-back" style="display:none" onclick="render(null)">← Mapa nacional</button></div>
+    <div id="mapa"></div>
+  </div>
+  <div class="card"><div id="panel"></div></div>
+</div>
+
+<details><summary>Departamentos bisagra (ordenados por peso electoral)</summary>
+  <div class="body">__BISAGRA_TBL__</div></details>
+<details><summary>Modelo de transferencia y vertientes (escenario base)</summary>
+  <div class="body">__TRANSF_TBL__</div></details>
+<div class="nota">Trasvase de los partidos mayores (Renovación Popular, Buen Gobierno, Obras,
+País para Todos, Ahora Nación) de cruces Ipsos may-2026; el resto, heurística por bloque. Ver FUENTES.md.</div>
+
+<script>
+const DATA = __DATA__;
+const GEO = __GEO__;
+const CATCOLOR = __CATCOLOR__;
+const CATLABEL = {ancla_keiko:"Ancla Keiko", inclina_keiko:"Inclina Keiko", bisagra:"Bisagra",
+                  inclina_sanchez:"Inclina Sánchez", ancla_sanchez:"Ancla Sánchez"};
+const ORDEN = ["ancla_keiko","inclina_keiko","bisagra","inclina_sanchez","ancla_sanchez"];
+const ESCN = {base:"Base", favK:"Favorable Keiko", favS:"Favorable Sánchez"};
+const ALPHA = 0.5, U_ANCLA = 10, U_BIS = 5;
+const fmt = n => (n==null?"—":Math.round(n).toLocaleString("es-PE"));
+const STATE = {}; let CUR = null;
+const clon = o => JSON.parse(JSON.stringify(o));
+const textoDark = lab => (lab.includes("Inclina")||lab==="Bisagra");
+
+function entrada(key){
+  const id = key || "__nac__";
+  if(!STATE[id]) STATE[id] = clon(key ? DATA.departamentos[key] : DATA.nacional);
+  return STATE[id];
+}
+function calcEsc(parts){
+  const tally = scn => {
+    let vk=0, vs=0;
+    for(const p of parts){
+      let k=p.k/100, s=p.s/100, n=Math.max(0,1-k-s);
+      if(scn==="favK") k+=ALPHA*n; else if(scn==="favS") s+=ALPHA*n;
+      vk+=p.votos*k; vs+=p.votos*s;
+    }
+    const dos=(vk+vs)||1;
+    return {k:+(vk/dos*100).toFixed(2), s:+(vs/dos*100).toFixed(2),
+            margen:+((vk-vs)/dos*100).toFixed(2), ganador: vk>=vs?"keiko":"sanchez"};
+  };
+  return {base:tally("base"), favK:tally("favK"), favS:tally("favS")};
+}
+function calcCat(esc){
+  const g=new Set([esc.base.ganador,esc.favK.ganador,esc.favS.ganador]);
+  const m=esc.base.margen, w=esc.base.ganador;
+  if(g.size>1 || Math.abs(m)<U_BIS) return "bisagra";
+  return (Math.abs(m)>=U_ANCLA ? "ancla_" : "inclina_")+w;
+}
+function badgeHTML(catKey){
+  if(!catKey) return `<span class="badge" style="background:#374151;color:#fff">Nacional</span>`;
+  const lab=CATLABEL[catKey];
+  return `<span class="badge" id="badge" style="background:${CATCOLOR[lab]};color:${textoDark(lab)?'#1f2937':'#fff'}">${lab}</span>`;
+}
+
+// ── Mapa ───────────────────────────────────────────────────────────────────
+const MAP_CFG = {displayModeBar:false, responsive:true};
+function mapaNacional(){
+  const grupos = {};
+  for(const key in DATA.departamentos){
+    const c = DATA.departamentos[key].catKey || "bisagra";
+    (grupos[c] = grupos[c] || []).push(key);
+  }
+  const traces = ORDEN.filter(c=>grupos[c]).map(c=>({
+    type:"choropleth", geojson:GEO, featureidkey:"properties.KEY",
+    locations:grupos[c], z:grupos[c].map(()=>1), showscale:false,
+    colorscale:[[0,CATCOLOR[CATLABEL[c]]],[1,CATCOLOR[CATLABEL[c]]]],
+    name:CATLABEL[c], showlegend:true, marker:{line:{width:.4,color:"#fff"}},
+    hovertemplate:"<b>%{location}</b><br>"+CATLABEL[c]+" · clic para ver<extra></extra>"
+  }));
+  Plotly.react("mapa", traces, {
+    geo:{fitbounds:"locations", visible:false, bgcolor:"rgba(0,0,0,0)"},
+    margin:{l:0,r:0,t:0,b:0}, paper_bgcolor:"rgba(0,0,0,0)",
+    legend:{orientation:"h", yanchor:"bottom", y:-0.04, xanchor:"center", x:0.5, font:{size:11}}
+  }, MAP_CFG);
+  const gd=document.getElementById("mapa");
+  gd.removeAllListeners && gd.removeAllListeners("plotly_click");
+  gd.on("plotly_click", e=>{ if(e.points&&e.points.length) render(e.points[0].location); });
+  document.getElementById("map-hd").textContent = "Mapa nacional · clic en un departamento";
+  document.getElementById("map-back").style.display = "none";
+}
+function mapaDepto(key, catKey){
+  const lab = CATLABEL[catKey], nombre = DATA.departamentos[key].nombre;
+  const gj = {type:"FeatureCollection", features: GEO.features.filter(f=>f.properties.KEY===key)};
+  Plotly.react("mapa", [{
+    type:"choropleth", geojson:gj, featureidkey:"properties.KEY",
+    locations:[key], z:[1], showscale:false,
+    colorscale:[[0,CATCOLOR[lab]],[1,CATCOLOR[lab]]],
+    marker:{line:{width:1.2,color:"#fff"}},
+    hovertemplate:"<b>"+nombre+"</b><br>"+lab+"<extra></extra>"
+  }], {
+    geo:{fitbounds:"locations", visible:false, bgcolor:"rgba(0,0,0,0)"},
+    margin:{l:0,r:0,t:30,b:0}, paper_bgcolor:"rgba(0,0,0,0)",
+    title:{text:nombre+" — "+lab, x:.5, y:.97, font:{size:14}}
+  }, MAP_CFG);
+  document.getElementById("map-hd").textContent = "Departamento: " + nombre;
+  document.getElementById("map-back").style.display = "";
+}
+
+// ── Panel ──────────────────────────────────────────────────────────────────
+function tablaPartidos(parts, editable){
+  let hayOv = parts.some(p=>p.override);
+  let rows = parts.map((p,i)=>{
+    const splitBar = `<span class="split"><i class="sk" id="sk${i}" style="width:${p.k}%"></i><i class="ss" id="ss${i}" style="width:${p.s}%"></i><i class="sn" id="sn${i}" style="width:${p.n}%"></i></span>`;
+    const mk = p.override ? ' <span title="ajuste propio del departamento" style="color:#2563eb;font-weight:700">▲</span>' : '';
+    const baseTag = p.base ? ' <span title="base propia del candidato; no se ajusta" style="font-size:.66rem;color:#6b7280;border:1px solid #e5e7eb;border-radius:4px;padding:0 4px">base fija</span>' : '';
+    let celda;
+    if(editable && p.editable){
+      celda = `<td class="edit">
+        <div class="kswrap">
+          <span class="kl">K</span><input class="pct" type="number" min="0" max="100" step="1" value="${p.k}" data-i="${i}" data-f="k">%
+          <span class="sl">S</span><input class="pct" type="number" min="0" max="100" step="1" value="${p.s}" data-i="${i}" data-f="s">%
+          <span class="nulo">Nulo <b id="nv${i}">${p.n}</b>%</span>
+        </div>${splitBar}</td>`;
+    } else {
+      celda = `<td style="text-align:center">${splitBar}</td>`;
+    }
+    return `<tr><td>${p.partido}${mk}${baseTag}</td><td>${fmt(p.votos)}</td>${celda}
+            <td id="ak${i}">${fmt(p.aporteK)}</td><td id="as${i}">${fmt(p.aporteS)}</td></tr>`;
+  }).join("");
+  if(hayOv) rows += `<tr><td colspan="5" style="color:#2563eb;font-size:.72rem;border:0">▲ trasvase ajustado a la idiosincrasia de este departamento</td></tr>`;
+  const cab = editable ? "Reparto del voto (editable)" : "→K / →S / →Nulo";
+  return `<table class="ptbl"><thead><tr><th>Partido (1ra v.)</th><th>Votos</th>
+          <th style="text-align:left">${cab}</th><th>→ Keiko</th><th>→ Sánchez</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function chart(esc){
+  const escs=["base","favK","favS"];
+  Plotly.react("panel-chart", [
+    {x:escs.map(e=>ESCN[e]), y:escs.map(e=>esc[e].k), type:"bar", name:"Keiko",
+     marker:{color:"#C2410C"}, text:escs.map(e=>esc[e].k+"%"), textposition:"outside"},
+    {x:escs.map(e=>ESCN[e]), y:escs.map(e=>esc[e].s), type:"bar", name:"Sánchez",
+     marker:{color:"#B91C1C"}, text:escs.map(e=>esc[e].s+"%"), textposition:"outside"}
+  ], {barmode:"group", height:230, yaxis:{range:[0,72],ticksuffix:"%"},
+      margin:{l:34,r:8,t:8,b:22}, legend:{orientation:"h",y:1.15}, font:{size:11}}, MAP_CFG);
+}
+function refrescar(){
+  const d = entrada(CUR), esc = calcEsc(d.partidos), b = esc.base;
+  document.querySelector(".res .b.k .big").textContent = b.k+"%";
+  document.querySelector(".res .b.s .big").textContent = b.s+"%";
+  const gan = b.ganador==="keiko"?"Keiko":"Sánchez";
+  document.getElementById("sub").textContent =
+    `Votos válidos 1ra vuelta: ${fmt(d.peso)} · gana ${gan} (base) · margen ${b.margen>=0?"+":""}${b.margen} pts`;
+  if(CUR){ const ck=calcCat(esc), lab=CATLABEL[ck], bd=document.getElementById("badge");
+           bd.textContent=lab; bd.style.background=CATCOLOR[lab]; bd.style.color=textoDark(lab)?"#1f2937":"#fff";
+           mapaDepto(CUR, ck); }
+  chart(esc);
+}
+function onEdit(inp){
+  const d = entrada(CUR), i = +inp.dataset.i, f = inp.dataset.f, p = d.partidos[i];
+  let val = Math.max(0, Math.min(100, +inp.value||0));
+  const other = f==="k" ? p.s : p.k;
+  if(val + other > 100){ val = 100 - other; inp.value = val; }
+  p[f] = val; p.n = +(100 - p.k - p.s).toFixed(1);
+  p.aporteK = Math.round(p.votos*p.k/100); p.aporteS = Math.round(p.votos*p.s/100);
+  document.getElementById("nv"+i).textContent = p.n;
+  document.getElementById("sk"+i).style.width = p.k+"%";
+  document.getElementById("ss"+i).style.width = p.s+"%";
+  document.getElementById("sn"+i).style.width = p.n+"%";
+  document.getElementById("ak"+i).textContent = fmt(p.aporteK);
+  document.getElementById("as"+i).textContent = fmt(p.aporteS);
+  inp.classList.add("edited");
+  refrescar();
+}
+function exportar(){
+  const filas=[["departamento","tipo","clave","keiko","sanchez","null","nota"]];
+  for(const id in STATE){
+    if(id==="__nac__") continue;
+    const cur=STATE[id], orig=DATA.departamentos[id]; if(!orig) continue;
+    cur.partidos.forEach((p,i)=>{
+      if(!p.editable) return;
+      const o=orig.partidos[i];
+      if(p.k!==o.k || p.s!==o.s)
+        filas.push([cur.nombre,"partido",p.partido,p.k,p.s,+(100-p.k-p.s).toFixed(1),"ajuste manual dashboard"]);
+    });
+  }
+  if(filas.length===1){ alert("No hay ajustes manuales para exportar."); return; }
+  const csv=filas.map(r=>r.map(c=>{c=String(c);return c.includes(",")?'"'+c+'"':c;}).join(",")).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download="overrides_departamento.csv"; a.click();
+}
+function restablecer(){ if(CUR){ delete STATE[CUR]; render(CUR); } }
+
+function render(key){
+  CUR = key || null;
+  const d = entrada(key), esc = calcEsc(d.partidos), b = esc.base;
+  const catKey = key ? calcCat(esc) : null;
+  const gan = b.ganador==="keiko" ? "Keiko" : "Sánchez";
+  const toolbar = key ? `<div class="toolbar">
+      <span class="lbl">Afinar reparto de este departamento</span>
+      <button onclick="restablecer()">Restablecer</button>
+      <button onclick="exportar()">Exportar ajustes CSV</button></div>` : "";
+
+  document.getElementById("panel").innerHTML = `
+    <h2 class="pnl-title">${d.nombre} ${badgeHTML(catKey)}</h2>
+    <div class="pnl-sub" id="sub">Votos válidos 1ra vuelta: ${fmt(d.peso)} · gana ${gan} (base) · margen ${b.margen>=0?"+":""}${b.margen} pts</div>
+    <div class="res">
+      <div class="b k"><div class="big">${b.k}%</div><div class="lbl">Keiko (FP)</div></div>
+      <div class="b s"><div class="big">${b.s}%</div><div class="lbl">Sánchez (JxP)</div></div>
+    </div>
+    <div id="panel-chart"></div>
+    <div style="font-weight:600;font-size:.85rem;margin:6px 0 2px">¿De dónde viene cada voto?
+      ${key ? '<span style="font-weight:400;color:#6b7280">— mueve los % para afinar</span>' : '(escenario base)'}</div>
+    ${toolbar}
+    ${tablaPartidos(d.partidos, !!key)}
+    ${key ? '<div class="hint" id="volver">↩ volver a la vista nacional</div>'
+          : '<div class="hint">Vista nacional. Clic en un departamento del mapa para ver y afinar su detalle.</div>'}`;
+
+  if(key){
+    document.getElementById("volver").style.cursor="pointer";
+    document.getElementById("volver").onclick=()=>render(null);
+    document.querySelectorAll("#panel input.pct").forEach(inp=>inp.addEventListener("input",()=>onEdit(inp)));
+    mapaDepto(key, catKey);
+  } else {
+    mapaNacional();
+  }
+  chart(esc);
+}
+
+window.addEventListener("load", ()=>{ render(null); });
+</script>
+</body></html>"""
