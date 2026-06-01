@@ -74,7 +74,8 @@ def _entrada(nombre, prj_esc, cat_key, peso, depto_norm, partidos, resolver):
     }
 
 
-def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indice, peso_iar, salida: Path):
+def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indice, historial,
+                      peso_iar, salida: Path):
     nac = proyeccion["nacional"]
     base = nac["base"]
 
@@ -99,11 +100,27 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indi
         ix = indice.get(norm(depto), {})
         ent["net"] = ix.get("net", 0.0)
         ent["iarK"] = ix.get("iar_keiko", 50); ent["iarS"] = ix.get("iar_sanchez", 50)
+        serie = historial.get(norm(depto), [])
+        ent["hist"] = [{"f": h["fecha"], "net": h["net"]} for h in serie]
+        ent["tend"] = round(serie[-1]["net"] - serie[-2]["net"], 3) if len(serie) >= 2 else 0.0
         embed["departamentos"][norm(depto)] = ent
     # Nacional ya ajustado por IAR (no se recalcula en vivo): se embebe precomputado
     embed["nacional"]["escNac"] = {
         e: {"k": nac[e]["pct_keiko"], "s": nac[e]["pct_sanchez"],
             "margen": nac[e]["margen"], "ganador": nac[e]["ganador"]} for e in ESCENARIOS}
+    # Serie nacional del IAR (promedio ponderado por peso electoral) = indicador adelantado
+    pesos = {norm(d): clasif["por_departamento"][d]["peso"] for d in clasif["por_departamento"]}
+    fechas = sorted({h["fecha"] for s in historial.values() for h in s})
+    nac_hist = []
+    for f in fechas:
+        num = den = 0.0
+        for dk, serie in historial.items():
+            pt = next((x for x in serie if x["fecha"] == f), None)
+            if pt:
+                num += pt["net"] * pesos.get(dk, 0); den += pesos.get(dk, 0)
+        nac_hist.append({"f": f, "net": round(num / den, 3) if den else 0.0})
+    embed["nacional"]["hist"] = nac_hist
+    embed["nacional"]["tend"] = round(nac_hist[-1]["net"] - nac_hist[-2]["net"], 3) if len(nac_hist) >= 2 else 0.0
 
     bisagra_tbl = _tabla(
         ["#", "Departamento", "Votos válidos 1ra v.", "Margen base", "favK", "favS"],
@@ -203,6 +220,9 @@ _PLANTILLA = r"""<!DOCTYPE html>
   .iar-sl { display:flex; align-items:center; gap:8px; margin-top:6px; font-size:.76rem; color:#374151; }
   .iar-sl input[type=range] { flex:1; max-width:160px; }
   .iar-hint { color:#9ca3af; }
+  .iar .lead { background:#1e3a8a; color:#fff; font-size:.66rem; padding:1px 6px; border-radius:4px; }
+  .iar-tend { font-size:.78rem; color:#374151; margin-top:4px; }
+  #iar-spark { margin-top:2px; }
   details { background:#fff; border:1px solid #e5e7eb; border-radius:10px; margin:0 12px 12px; }
   details > summary { padding:10px 14px; cursor:pointer; font-weight:600; font-size:.9rem; }
   details .body { padding:0 14px 14px; overflow:auto; }
@@ -260,6 +280,18 @@ const STATE = {}; let CUR = null;
 let PESO_IAR = __PESOIAR__;   // intensidad del Índice de Aceptación en Redes (slider)
 const clon = o => JSON.parse(JSON.stringify(o));
 const textoDark = lab => (lab.includes("Inclina")||lab==="Bisagra");
+const tendTxt = t => { const a=Math.round(Math.abs(t)*100);
+  if(a<1) return "estable (sin cambio relevante)";
+  return (t<0?"moviéndose hacia Sánchez ▼K":"moviéndose hacia Keiko ▲K")+` (${t<0?'−':'+'}${a} pts net)`; };
+function drawSpark(serie){
+  const el=document.getElementById("iar-spark"); if(!el||!serie||!serie.length) return;
+  Plotly.react("iar-spark", [{x:serie.map(p=>p.f), y:serie.map(p=>p.net),
+    type:"scatter", mode:"lines+markers", line:{color:"#374151",width:2}, marker:{size:6},
+    hovertemplate:"%{x}: neto %{y}<extra></extra>"}],
+   {height:96, margin:{l:26,r:6,t:6,b:20},
+    yaxis:{range:[-1,1], zeroline:true, zerolinecolor:"#cbd5e1", tickvals:[-1,0,1]},
+    xaxis:{type:"category"}, font:{size:9}, showlegend:false}, MAP_CFG);
+}
 
 function entrada(key){
   const id = key || "__nac__";
@@ -437,13 +469,19 @@ function render(key){
       <button onclick="exportar()">Exportar ajustes CSV</button></div>` : "";
   const netTxt = !key ? "" : (d.net>0 ? "favorece a Keiko" : d.net<0 ? "favorece a Sánchez" : "neutro");
   const iarBlock = key ? `<div class="iar">
-      <div class="iar-hd">Aceptación en redes (IAR):
+      <div class="iar-hd">Aceptación en redes (IAR) · <span class="lead">indicador adelantado</span>:
         <b style="color:#C2410C">Keiko ${d.iarK}</b> · <b style="color:#B91C1C">Sánchez ${d.iarS}</b>
         <span class="iar-net">${netTxt} (neto ${d.net>0?'+':''}${Math.round(d.net*100)})</span></div>
+      <div class="iar-tend">Tendencia: ${tendTxt(d.tend)}</div>
+      <div id="iar-spark"></div>
       <div class="iar-sl"><label>Peso del IAR: <b id="pesoval">${PESO_IAR.toFixed(2)}</b></label>
         <input type="range" id="pesoiar" min="0" max="1" step="0.05" value="${PESO_IAR}">
         <span class="iar-hint">0 = ignorar redes · rompe el voto indeciso hacia quien tiene mejor aceptación</span></div>
     </div>` : "";
+  const iarNac = key ? "" : `<div class="iar">
+      <div class="iar-hd">Aceptación en redes (IAR) · <span class="lead">indicador adelantado nacional</span></div>
+      <div class="iar-tend">Tendencia: ${tendTxt(DATA.nacional.tend)}</div>
+      <div id="iar-spark"></div></div>`;
 
   document.getElementById("panel").innerHTML = `
     <h2 class="pnl-title">${d.nombre} ${badgeHTML(catKey)}</h2>
@@ -453,7 +491,7 @@ function render(key){
       <div class="b s"><div class="big">${b.s}%</div><div class="lbl">Sánchez (JxP)</div></div>
     </div>
     <div id="panel-chart"></div>
-    ${iarBlock}
+    ${iarBlock}${iarNac}
     <div style="font-weight:600;font-size:.85rem;margin:6px 0 2px">¿De dónde viene cada voto?
       ${key ? '<span style="font-weight:400;color:#6b7280">— mueve los % para afinar</span>' : '(escenario base)'}</div>
     ${toolbar}
@@ -473,6 +511,7 @@ function render(key){
     mapaNacional();
   }
   chart(esc);
+  drawSpark(key ? d.hist : DATA.nacional.hist);
 }
 
 window.addEventListener("load", ()=>{ render(null); });

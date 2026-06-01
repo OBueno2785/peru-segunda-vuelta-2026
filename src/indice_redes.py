@@ -37,6 +37,24 @@ def cargar_social() -> dict:
     return out
 
 
+def cargar_historial() -> dict:
+    """Serie temporal del IAR (indicador adelantado).
+
+    CSV: fecha,departamento,net,... → { depto_norm: [{'fecha','net'}, ...] } ordenado por fecha.
+    """
+    path = DATA_DIR / "indice_historial.csv"
+    out = {}
+    if not path.exists():
+        return out
+    with open(path, encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            out.setdefault(norm(row["departamento"]), []).append(
+                {"fecha": row["fecha"], "net": float(row["net"])})
+    for serie in out.values():
+        serie.sort(key=lambda x: x["fecha"])
+    return out
+
+
 def cargar_indice() -> dict:
     """{ depto_norm: {iar_keiko, iar_sanchez, net, cobertura, fuente} } (net ∈ [-1,1])."""
     path = DATA_DIR / "indice_redes.csv"

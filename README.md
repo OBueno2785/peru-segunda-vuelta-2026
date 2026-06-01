@@ -65,21 +65,23 @@ Genera dos salidas en la raíz:
 - **Afinado en vivo** — en el panel del departamento puedes editar el reparto →Keiko/→Sánchez
   de cada partido eliminado; las tarjetas, los escenarios, la categoría y el color del mapa
   se recalculan al instante. La base de los finalistas queda fija ("base fija").
-- **Índice de Aceptación en Redes** — el panel del departamento muestra el IAR (Keiko vs
-  Sánchez) y un **slider de peso** que rompe el voto indeciso según las redes y recalcula todo
-  en vivo (peso 0 = modelo puro).
+- **Índice de Aceptación en Redes (indicador adelantado)** — el panel muestra el IAR (Keiko vs
+  Sánchez), su **tendencia** y un **sparkline** de la serie temporal, más un **slider de peso**
+  que rompe el voto indeciso según las redes y recalcula todo en vivo (peso 0 = modelo puro).
+  El IAR se monitorea de forma recurrente (ver [`MONITOREO.md`](MONITOREO.md)).
 - **Exportar ajustes CSV** — descarga tus cambios en el formato de `overrides_departamento.csv`
   para pegarlos en `data/` y volverlos permanentes. **Restablecer** vuelve al modelo.
 
 ## Estructura
 
 ```
-data/      snapshot 1ra vuelta, GeoJSON, vertientes, matriz de transferencia,
-           overrides_departamento.csv (ajustes locales) e indice_redes.csv (IAR);
-           social_signals.csv opcional (adaptador de redes)
-src/       carga, transferencia, proyección, clasificación, índice de redes, reporte
-main.py    pipeline completo + chequeos de integridad
-FUENTES.md encuestas, endosos, IAR y notas metodológicas (con URLs)
+data/        snapshot 1ra vuelta, GeoJSON, vertientes, matriz de transferencia,
+             overrides_departamento.csv, indice_redes.csv (IAR) e indice_historial.csv
+             (serie temporal); social_signals.csv opcional (adaptador de redes)
+src/         carga, transferencia, proyección, clasificación, índice de redes, reporte
+main.py      pipeline completo + chequeos de integridad
+MONITOREO.md cómo re-medir el IAR de forma recurrente (indicador adelantado)
+FUENTES.md   encuestas, endosos, IAR y notas metodológicas (con URLs)
 ```
 
 ## Limitaciones

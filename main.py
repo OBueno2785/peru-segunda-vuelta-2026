@@ -12,7 +12,7 @@ from src.proyeccion import proyectar, hacer_resolver, aplicar_indice
 from src.transferencia import ESCENARIOS
 from src.clasificacion import clasificar
 from src.reporte import construir_informe
-from src.indice_redes import cargar_indice, PESO_IAR
+from src.indice_redes import cargar_indice, cargar_historial, PESO_IAR
 
 RAIZ = Path(__file__).resolve().parent
 
@@ -60,6 +60,7 @@ def main():
     proyeccion = proyectar(pv, resolver)
 
     indice = cargar_indice()
+    historial = cargar_historial()
     if indice:
         print(f"  Índice de aceptación en redes: {len(indice)} departamento(s), peso={PESO_IAR}")
         aplicar_indice(proyeccion, pv, indice, PESO_IAR)
@@ -93,8 +94,8 @@ def main():
     print("  -> resultados.json")
 
     print("Generando informe.html...")
-    construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indice, PESO_IAR,
-                      RAIZ / "informe.html")
+    construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indice, historial,
+                      PESO_IAR, RAIZ / "informe.html")
     print("  -> informe.html")
 
     nac = proyeccion["nacional"]["base"]
