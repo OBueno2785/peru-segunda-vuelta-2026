@@ -1,26 +1,26 @@
 departamento,iar_keiko,iar_sanchez,net,cobertura,fuente
-LIMA,56,44,0.11,dedicada,Lima pro-Keiko; recta final estable (2-jun)
-CALLAO,55,45,0.10,regional,Patrón Lima metropolitana; leve pro-Keiko
-PIURA,65,35,0.30,regional,Costa norte pro-Keiko
-LAMBAYEQUE,65,35,0.30,regional,Costa norte pro-Keiko
-TUMBES,68,32,0.35,regional,Costa norte (Tumbes-Ica) fuerte pro-Keiko
-LA LIBERTAD,55,45,0.10,dedicada,Bisagra costa norte; leve tightening hacia Sánchez (2-jun)
-ICA,60,40,0.20,regional,Costa sur-norte pro-Keiko
-LORETO,62,38,0.25,regional,Oriente/Amazonía pro-Keiko (Ipsos oriente 36.8)
-UCAYALI,62,38,0.25,regional,Oriente/Amazonía pro-Keiko
-SAN MARTIN,56,44,0.12,regional,Selva norte; pro-Keiko moderado
-MADRE DE DIOS,55,45,0.10,regional,Amazonía sur; leve pro-Keiko
-AMAZONAS,52,48,0.05,regional,Nororiente; casi neutro
-CAJAMARCA,41,59,-0.18,regional,Sierra norte pro-Sánchez
-ANCASH,48,52,-0.05,regional,Bisagra; casi neutro con leve pro-Sánchez
-HUANUCO,42,58,-0.15,regional,Sierra centro pro-Sánchez
-JUNIN,44,56,-0.12,regional,Bisagra sierra centro; leve momentum Sánchez (2-jun)
-PASCO,42,58,-0.15,regional,Sierra centro pro-Sánchez
-HUANCAVELICA,32,68,-0.35,regional,Sierra sur pro-Sánchez
-AYACUCHO,30,70,-0.40,regional,Sur andino fuerte pro-Sánchez
-APURIMAC,30,70,-0.40,regional,Sur andino fuerte pro-Sánchez
-AREQUIPA,41,59,-0.18,dedicada,Bisagra clave; cierre de campaña de Sánchez en el sur (2-jun)
-CUSCO,28,72,-0.45,dedicada,Bastión sur de Sánchez (cierre campaña 2-jun)
-PUNO,25,75,-0.50,dedicada,Bastión sur andino de Sánchez (Cierre Sur Andino 3-jun)
-MOQUEGUA,40,60,-0.20,regional,Sur pro-Sánchez
-TACNA,35,65,-0.30,regional,Sur pro-Sánchez
+LIMA,56,44,0.12,dedicada,Keiko lidera Lima metro (Ipsos 45.6-52.2) pese a marchas/antivoto
+CALLAO,56,44,0.12,dedicada,Keiko ganó Callao en 1ra vuelta
+TUMBES,68,32,0.35,dedicada,Keiko ganó 1ra v. 33.96% (su zona más fuerte)
+PIURA,65,35,0.30,dedicada,Keiko ganó 1ra v. 27.97%; costa norte FP
+LAMBAYEQUE,64,36,0.28,dedicada,Keiko ganó 1ra v. 26.41%
+LA LIBERTAD,55,45,0.10,dedicada,Keiko ganó 1ra v. pero bisagra disputada
+ICA,60,40,0.20,dedicada,Keiko ganó 1ra v. 20.3%
+LORETO,61,39,0.22,dedicada,Keiko ganó 1ra v. 28.13% (Amazonía FP)
+UCAYALI,61,39,0.22,dedicada,Keiko ganó 1ra v. 29.53% (Amazonía FP)
+ANCASH,53,47,0.06,dedicada,Keiko ganó 1ra v. estrecho; bisagra
+PASCO,52,48,0.05,dedicada,Keiko ganó Pasco en 1ra v.; sierra centro disputada
+JUNIN,46,54,-0.08,dedicada,Keiko ganó 1ra v. estrecho pero 2da v. CPI Sánchez 44-34; bisagra
+CAJAMARCA,40,60,-0.20,dedicada,Sánchez ganó 1ra v. (sierra norte)
+AMAZONAS,40,60,-0.20,dedicada,Sánchez ganó 1ra v. 36.25% vs Keiko 17.36%
+HUANUCO,38,62,-0.25,dedicada,Sánchez ganó 1ra v. casi el doble que Keiko
+SAN MARTIN,47,53,-0.06,dedicada,Sánchez ganó 1ra v. muy estrecho (93.3k vs 90.7k); bisagra
+MADRE DE DIOS,42,58,-0.15,dedicada,Sánchez ganó 1ra v. 23.36%
+HUANCAVELICA,30,70,-0.40,dedicada,Sánchez ganó 1ra v. 43.43% (de sus más altos)
+AYACUCHO,31,69,-0.38,dedicada,Sánchez ganó 1ra v. 31.33%
+APURIMAC,29,71,-0.42,dedicada,Sánchez ganó 1ra v. 40.98%
+AREQUIPA,41,59,-0.18,dedicada,Keiko nunca ganó Arequipa; bisagra clave; cierre sur Sánchez
+CUSCO,28,72,-0.45,dedicada,Bastión sur de Sánchez; Keiko nunca ganó
+PUNO,24,76,-0.52,dedicada,Bastión sur andino; Keiko nunca ganó (su voto más bajo)
+MOQUEGUA,35,65,-0.30,dedicada,Keiko apenas 6.63% en 1ra v.; fuerte anti-FP
+TACNA,35,65,-0.30,dedicada,Belmont ganó 1ra v.; sur anti-FP; Keiko nunca ganó Tacna

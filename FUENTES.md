@@ -66,6 +66,27 @@ El `net` por departamento es juicio del autor a partir de esa evidencia (no medi
 redes). El adaptador `data/social_signals.csv` permite sustituirlo por métricas reales de social
 listening. El IAR solo **rompe el voto indeciso** del departamento, acotado por su tamaño.
 
+### Cobertura dedicada por departamento (2-jun-2026)
+
+Se elevó la cobertura a **dedicada en los 25 departamentos**, anclando el `net` en el
+**ganador y % de 1ra vuelta por región (ONPE)** + encuestas regionales (CPI/Ipsos):
+
+- Keiko 1ra v.: Lima, Callao, Tumbes (33.96%), Piura (27.97%), Lambayeque (26.41%), La Libertad,
+  Áncash, Ica, Loreto (28.13%), Ucayali (29.53%), Pasco.
+- Sánchez 1ra v.: Cajamarca, Amazonas (36.25% vs 17.36%), Huánuco, San Martín (estrecho),
+  Madre de Dios, Huancavelica (43.43%), Ayacucho (31.33%), Apurímac (40.98%), Moquegua
+  (Keiko 6.63%), Puno, Cusco. Tacna la ganó Belmont; el sur es históricamente anti-FP
+  (Keiko nunca ganó Puno, Apurímac, Arequipa, Ayacucho, Cusco, Moquegua, Tacna).
+- Regional 2da v.: Lima/Callao 45.6% Keiko, oriente 36.8% Keiko, costa-sierra norte 32.1% Keiko;
+  sierra centro-sur 53.3% Sánchez, rural 53.9% Sánchez; Junín 44-34 Sánchez.
+
+Fuentes (Infobae "11 regiones cada uno", ONPE al 100%, CPI/Ipsos por regiones):
+- [Infobae — así votó cada región (11 c/u)](https://www.infobae.com/peru/2026/05/15/elecciones-2026-asi-votaron-todas-las-regiones-y-cuantos-votos-obtuvieron-keiko-fujimori-y-roberto-sanchez/)
+- [Infobae — regiones de Sánchez (ONPE 100%)](https://www.infobae.com/peru/2026/05/13/onpe-al-100-roberto-sanchez-y-las-regiones-que-marcaron-su-camino-para-pelear-la-segunda-vuelta-presidencial-con-keiko-fujimori/)
+- [RPP — CPI intención de voto por regiones](https://rpp.pe/politica/elecciones/encuesta-cpi-segunda-vuelta-2026-keiko-fujimori-325-vs-roberto-sanchez-291-intencion-de-voto-por-regiones-noticia-1690615)
+- [La República — Ipsos: rural 53.9% Sánchez, Lima 52.2% Keiko](https://larepublica.pe/politica/2026/05/31/encuesta-presidencial-ipsos-roberto-sanchez-lidera-en-zona-rural-con-539-y-keiko-fujimori-en-lima-con-522-hnews-1492123)
+- [Expreso — dónde ganó cada uno](https://www.expreso.com.pe/politica/segunda-vuelta-electoral-2026-donde-gano-keiko-fujimori-y-en-que-regiones-se-impuso-roberto-sanchez-jpp-noticia/1287333/)
+
 ## Nota metodológica sobre la cola de partidos
 
 Los partidos menores (<3%) sin cruce de encuesta se clasificaron por **bloque ideológico**
