@@ -64,6 +64,24 @@ def cargar_vertientes() -> dict:
     return out
 
 
+def cargar_mercados() -> dict:
+    """Probabilidad de ganar según casas de apuestas / mercados de predicción.
+
+    CSV: candidato,prob_ganar,fuente → {'keiko','sanchez','fuente'} (prob 0-1).
+    """
+    path = DATA_DIR / "mercados_apuestas.csv"
+    if not path.exists():
+        return {}
+    out = {"fuente": ""}
+    with open(path, encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            cand = norm(row["candidato"])
+            lado = "keiko" if "KEIKO" in cand or "FUJIMORI" in cand else "sanchez"
+            out[lado] = float(row["prob_ganar"])
+            out["fuente"] = out["fuente"] or row.get("fuente", "")
+    return out
+
+
 def cargar_overrides() -> dict:
     """Ajustes de trasvase por departamento (idiosincrasia local).
 

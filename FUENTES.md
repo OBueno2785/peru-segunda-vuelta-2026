@@ -87,6 +87,20 @@ Fuentes (Infobae "11 regiones cada uno", ONPE al 100%, CPI/Ipsos por regiones):
 - [La República — Ipsos: rural 53.9% Sánchez, Lima 52.2% Keiko](https://larepublica.pe/politica/2026/05/31/encuesta-presidencial-ipsos-roberto-sanchez-lidera-en-zona-rural-con-539-y-keiko-fujimori-en-lima-con-522-hnews-1492123)
 - [Expreso — dónde ganó cada uno](https://www.expreso.com.pe/politica/segunda-vuelta-electoral-2026-donde-gano-keiko-fujimori-y-en-que-regiones-se-impuso-roberto-sanchez-jpp-noticia/1287333/)
 
+## Mercados de apuestas / predicción (probabilidad de ganar)
+
+`data/mercados_apuestas.csv` guarda la probabilidad de **ganar** según mercados de predicción
+(no es % de voto). Snapshot 2-jun-2026: **Keiko ~78% / Sánchez ~22%**.
+
+- [Polymarket — Peru Presidential Election Winner](https://polymarket.com/event/peru-presidential-election-winner) (Keiko 78% / Sánchez 23%)
+- [Kalshi — Peru Presidency 2026](https://kalshi.com/markets/kxperupres/peru-presidency/kxperupres-26) (Keiko ~78%)
+- [Octagon AI — Fujimori implied odds 78%](https://octagonai.co/news/peru-presidential-election-2026-odds/)
+
+El dashboard muestra tres probabilidades de victoria: **Mercados** (de las casas), **Modelo**
+(derivada de la dispersión de escenarios: normal centrada en el margen base con σ ≈ mitad del
+rango favK–favS) y **Consenso** (promedio simple de ambas). La proyección de **voto** sigue
+siendo la estructural; la probabilidad de ganar es una capa de calibración aparte.
+
 ## Nota metodológica sobre la cola de partidos
 
 Los partidos menores (<3%) sin cruce de encuesta se clasificaron por **bloque ideológico**

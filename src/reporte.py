@@ -5,6 +5,7 @@ seleccionar un departamento el mapa se enfoca en su forma; los % de trasvase son
 editables por departamento y todo se recalcula en vivo.
 """
 import json
+import math
 from pathlib import Path
 
 from plotly.offline import get_plotlyjs
@@ -33,6 +34,10 @@ def _tabla(headers, filas) -> str:
 
 def _fmt_g(g):
     return "Keiko" if g == "keiko" else "Sánchez"
+
+
+def _ncdf(x):
+    return 0.5 * (1 + math.erf(x / math.sqrt(2)))
 
 
 def _detalle_partidos(depto_norm, partidos: dict, resolver, top: int = 10) -> list:
@@ -75,7 +80,7 @@ def _entrada(nombre, prj_esc, cat_key, peso, depto_norm, partidos, resolver):
 
 
 def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indice, historial,
-                      peso_iar, salida: Path):
+                      mercados, peso_iar, salida: Path):
     nac = proyeccion["nacional"]
     base = nac["base"]
 
@@ -137,6 +142,14 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indi
     embed["nacional"]["net"] = net_nac
     embed["nacional"]["iarK"] = round(50 + net_nac * 50)
     embed["nacional"]["iarS"] = round(50 - net_nac * 50)
+    # Probabilidad de GANAR (no % de voto): modelo (de la dispersión de escenarios) + mercados.
+    spread = max(2.0, (nac["favK"]["margen"] - nac["favS"]["margen"]) / 2)  # ≈1 sigma
+    p_model_k = round(_ncdf(base["margen"] / spread), 3)
+    p_mkt_k = mercados.get("keiko") if mercados else None
+    p_cons_k = round((p_model_k + p_mkt_k) / 2, 3) if p_mkt_k is not None else p_model_k
+    embed["nacional"]["prob"] = {
+        "model_keiko": p_model_k, "market_keiko": p_mkt_k, "consenso_keiko": p_cons_k,
+        "fuente": mercados.get("fuente", "") if mercados else ""}
 
     def _bisagra_fila(i, d):
         vk, vs = _vks(d["departamento"])
@@ -173,7 +186,10 @@ def construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indi
           f"{ix.get('net', 0):+.2f}", ix.get("cobertura", "—"), ix.get("fuente", "")]
          for d, ix in iar_filas])
 
+    mkt_chip = (f'<span class="chip meta">Mercados: Keiko {round(p_mkt_k*100)}%</span>'
+                if p_mkt_k is not None else "")
     html = (_PLANTILLA
+            .replace("__MKT_CHIP__", mkt_chip)
             .replace("__BASE_K__", f"{base['pct_keiko']:.1f}")
             .replace("__BASE_S__", f"{base['pct_sanchez']:.1f}")
             .replace("__GANADOR__", _fmt_g(base["ganador"]))
@@ -255,6 +271,11 @@ _PLANTILLA = r"""<!DOCTYPE html>
   .iar .lead { background:#1e3a8a; color:#fff; font-size:.66rem; padding:1px 6px; border-radius:4px; }
   .iar-tend { font-size:.78rem; color:#374151; margin-top:4px; }
   #iar-spark { margin-top:2px; }
+  table.prob { width:100%; border-collapse:collapse; font-size:.8rem; margin-top:6px; }
+  table.prob td { padding:3px 6px; border-bottom:1px solid #eef0f2; }
+  table.prob td:first-child { color:#374151; }
+  table.prob td:not(:first-child) { text-align:right; font-weight:600; }
+  table.prob tr.cons td { border-top:2px solid #cbd5e1; border-bottom:0; }
   details { background:#fff; border:1px solid #e5e7eb; border-radius:10px; margin:0 12px 12px; }
   details > summary { padding:10px 14px; cursor:pointer; font-weight:600; font-size:.9rem; }
   details .body { padding:0 14px 14px; overflow:auto; }
@@ -277,6 +298,7 @@ _PLANTILLA = r"""<!DOCTYPE html>
     <span class="chip s">Sánchez __BASE_S__%</span>
     <span class="chip meta">Gana __GANADOR__ · +__MARGEN__ pts (base)</span>
     <span class="chip meta">__N_BISAGRA__ bisagra</span>
+    __MKT_CHIP__
   </div>
 </header>
 
@@ -308,6 +330,8 @@ const ORDEN = ["ancla_keiko","inclina_keiko","bisagra","inclina_sanchez","ancla_
 const ESCN = {base:"Base", favK:"Favorable Keiko", favS:"Favorable Sánchez"};
 const ALPHA = 0.5, U_ANCLA = 10, U_BIS = 5;
 const fmt = n => (n==null?"—":Math.round(n).toLocaleString("es-PE"));
+const pct = x => (x==null?"—":Math.round(x*100)+"%");
+const pctc = x => (x==null?"—":(100-Math.round(x*100))+"%");  // complemento exacto (suma 100)
 const STATE = {}; let CUR = null;
 let PESO_IAR = __PESOIAR__;   // intensidad del Índice de Aceptación en Redes (slider)
 const META = DATA.meta;
@@ -535,6 +559,15 @@ function render(key){
         <span class="iar-net">(neto ${DATA.nacional.net>0?'+':''}${Math.round(DATA.nacional.net*100)})</span></div>
       <div class="iar-tend">Agrega los 25 departamentos (ponderado por peso electoral) → <b>genera el resultado proyectado de arriba</b>. Tendencia: ${tendTxt(DATA.nacional.tend)}</div>
       <div id="iar-spark"></div></div>`;
+  const P = DATA.nacional.prob || {};
+  const mktBlock = key ? "" : `<div class="iar">
+      <div class="iar-hd">Probabilidad de <b>ganar</b> la 2da vuelta <span class="lead">mercados + modelo</span></div>
+      <table class="prob"><tbody>
+        <tr><td>🏛️ Mercados de apuestas</td><td style="color:#C2410C">Keiko ${pct(P.market_keiko)}</td><td style="color:#B91C1C">Sánchez ${pctc(P.market_keiko)}</td></tr>
+        <tr><td>📊 Modelo (escenarios)</td><td style="color:#C2410C">Keiko ${pct(P.model_keiko)}</td><td style="color:#B91C1C">Sánchez ${pctc(P.model_keiko)}</td></tr>
+        <tr class="cons"><td>★ Consenso</td><td style="color:#C2410C">Keiko ${pct(P.consenso_keiko)}</td><td style="color:#B91C1C">Sánchez ${pctc(P.consenso_keiko)}</td></tr>
+      </tbody></table>
+      <div class="iar-hint">Prob. de <b>ganar</b> (no % de voto). Mercados: ${P.fuente||'—'}.</div></div>`;
 
   document.getElementById("panel").innerHTML = `
     <h2 class="pnl-title">${d.nombre} ${badgeHTML(catKey)}</h2>
@@ -545,7 +578,7 @@ function render(key){
       <div class="tug-lbls"><span>● Keiko (FP)</span><span>Sánchez (JxP) ●</span></div>
     </div>
     <div id="panel-chart"></div>
-    ${iarBlock}${iarNac}
+    ${iarBlock}${iarNac}${mktBlock}
     <div style="font-weight:600;font-size:.85rem;margin:6px 0 2px">¿De dónde viene cada voto?
       ${key ? '<span style="font-weight:400;color:#6b7280">— mueve los % para afinar</span>' : '(escenario base)'}</div>
     ${toolbar}

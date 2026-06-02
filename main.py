@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from src.cargar_datos import (cargar_primera_vuelta, cargar_transferencias,
-                              cargar_vertientes, cargar_overrides, norm, FINALISTAS)
+                              cargar_vertientes, cargar_overrides, cargar_mercados, norm, FINALISTAS)
 from src.proyeccion import proyectar, hacer_resolver, aplicar_indice
 from src.transferencia import ESCENARIOS
 from src.clasificacion import clasificar
@@ -61,6 +61,7 @@ def main():
 
     indice = cargar_indice()
     historial = cargar_historial()
+    mercados = cargar_mercados()
     if indice:
         print(f"  Índice de aceptación en redes: {len(indice)} departamento(s), peso={PESO_IAR}")
         aplicar_indice(proyeccion, pv, indice, PESO_IAR)
@@ -95,7 +96,7 @@ def main():
 
     print("Generando informe.html...")
     construir_informe(proyeccion, clasif, pv, transf, vertientes, resolver, indice, historial,
-                      PESO_IAR, RAIZ / "informe.html")
+                      mercados, PESO_IAR, RAIZ / "informe.html")
     print("  -> informe.html")
 
     nac = proyeccion["nacional"]["base"]
