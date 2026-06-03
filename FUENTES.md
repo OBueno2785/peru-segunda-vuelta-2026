@@ -87,6 +87,24 @@ Fuentes (Infobae "11 regiones cada uno", ONPE al 100%, CPI/Ipsos por regiones):
 - [La República — Ipsos: rural 53.9% Sánchez, Lima 52.2% Keiko](https://larepublica.pe/politica/2026/05/31/encuesta-presidencial-ipsos-roberto-sanchez-lidera-en-zona-rural-con-539-y-keiko-fujimori-en-lima-con-522-hnews-1492123)
 - [Expreso — dónde ganó cada uno](https://www.expreso.com.pe/politica/segunda-vuelta-electoral-2026-donde-gano-keiko-fujimori-y-en-que-regiones-se-impuso-roberto-sanchez-jpp-noticia/1287333/)
 
+## Sentimiento de prensa regional (`data/social_signals.csv`)
+
+Pasada de prensa regional con lectura de textos y conteo de **interacciones positivas/negativas**
+por candidato y departamento. Se mezcla 50/50 con el `net` de noticias (vía `cargar_indice`).
+
+- **Arequipa**: rechazo fuerte a Keiko — protestas "Keiko nunca más", llegó "de incógnito" entre
+  marchas (texto verificado en [La República](https://larepublica.pe/amp/politica/2026/05/28/sanchez-retoma-campana-en-regiones-y-fujimori-llega-de-incognito-al-sur-en-medio-de-protestas-hnews-788004); [El Búho](https://elbuho.pe/2026/05/keiko-fujimori-busca-votos-en-arequipa-se-que-la-mayoria-no-voto-por-mi-video/)). → net −0.18 ⇒ −0.33 (Ancla Sánchez).
+- **Junín**: Keiko ganó 1ra vuelta y tuvo recepción positiva en Huancayo (huaylarsh, cumpleaños)
+  ([Diario Correo](https://diariocorreo.pe/edicion/huancayo/keiko-fujimori-llegara-a-huancayo-para-la-segunda-vuelta-tras-consolidar-victoria-en-junin-noticia/)). → net −0.08 ⇒ +0.02 (toss-up).
+- **Áncash**: Keiko activa (puerto Chimbote, hospital Huarmey), ganó 1ra v. ([TVPerú](https://www.tvperu.gob.pe/noticias/politica/segunda-vuelta-keiko-fujimori-ofrece-nuevo-puerto-para-chimbote); [Áncash Noticias](https://ancashnoticias.com/)).
+- **San Martín**: disputado; Keiko mitin Tarapoto 1-jun ([TVPerú](https://www.tvperu.gob.pe/noticias/politica/segunda-vuelta-keiko-fujimori-plantea-telemedicina-y-programas-sociales-durante-mitin-en-tarapoto)), Sánchez ganó 1ra v. estrecho.
+- **Cusco / Puno**: bastiones anti-fujimoristas; Keiko nunca ganó → fuerte sentimiento negativo.
+
+**Cobertura de esta pasada:** bisagra (Arequipa, Junín, Áncash, San Martín, Pasco) + sur
+(Cusco, Puno). Arequipa fue verificada leyendo el texto íntegro; el resto combina lectura de
+titulares/notas regionales (Diario Correo, TVPerú, Áncash Noticias) con resultados ONPE. Varios
+portales regionales bloquean el fetch (HTTP 403), por lo que parte es a nivel de nota, no artículo completo.
+
 ## Mercados de apuestas / predicción (probabilidad de ganar)
 
 `data/mercados_apuestas.csv` guarda la probabilidad de **ganar** según mercados de predicción
