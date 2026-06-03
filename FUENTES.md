@@ -100,10 +100,18 @@ por candidato y departamento. Se mezcla 50/50 con el `net` de noticias (vía `ca
 - **San Martín**: disputado; Keiko mitin Tarapoto 1-jun ([TVPerú](https://www.tvperu.gob.pe/noticias/politica/segunda-vuelta-keiko-fujimori-plantea-telemedicina-y-programas-sociales-durante-mitin-en-tarapoto)), Sánchez ganó 1ra v. estrecho.
 - **Cusco / Puno**: bastiones anti-fujimoristas; Keiko nunca ganó → fuerte sentimiento negativo.
 
-**Cobertura de esta pasada:** bisagra (Arequipa, Junín, Áncash, San Martín, Pasco) + sur
-(Cusco, Puno). Arequipa fue verificada leyendo el texto íntegro; el resto combina lectura de
-titulares/notas regionales (Diario Correo, TVPerú, Áncash Noticias) con resultados ONPE. Varios
-portales regionales bloquean el fetch (HTTP 403), por lo que parte es a nivel de nota, no artículo completo.
+- **Junín**: el cierre de Keiko en Huancayo fue **"francamente desfavorable"** — gresca, quema de
+  banderas de FP, lacrimógenas, 2 detenidos (texto verificado en [Infobae](https://www.infobae.com/peru/2026/05/27/gresca-protestas-y-quema-de-banderas-de-fuerza-popular-marcan-el-cierre-de-campana-de-keiko-fujimori-en-huancayo/)). Pese a ganar 1ra v., el sentimiento se corrigió a anti-Keiko.
+- **Marchas nacionales "Keiko no va / Fujimori nunca más"** (30-31 may) en Lima, Trujillo, Arequipa,
+  Cusco, Ica, Huaraz, Tacna y Huancayo ([La República](https://larepublica.pe/politica/2026/05/31/gremios-colectivos-y-estudiantes-marcharon-contra-keiko-fujimori-hnews-443331)) — tempera el sentimiento pro-Keiko en centros urbanos.
+- **Norte/oriente (Keiko)**: recibida por artesanos/agricultores en Piura; "Ruta del Amazonas"
+  (Pucallpa, Contamana) en Loreto/Ucayali ([RPP](https://rpp.pe/politica/elecciones/elecciones-2026-los-recorridos-de-keiko-fujimori-y-roberto-sanchez-en-los-ultimos-dias-de-campana-noticia-1690320)).
+
+**Cobertura:** los **25 departamentos** tienen ahora fila de interacciones pos/neg en
+`social_signals.csv`. Verificados leyendo el texto íntegro: **Arequipa** y **Huancayo/Junín**
+(La República, Infobae). El resto combina notas de prensa regional (Diario Correo, TVPerú,
+Áncash Noticias, Canal N) + resultados ONPE + encuestas regionales. Algunos portales regionales
+bloquean el fetch (HTTP 403), por lo que parte es a nivel de nota, no artículo completo.
 
 ## Mercados de apuestas / predicción (probabilidad de ganar)
 

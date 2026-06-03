@@ -1,15 +1,51 @@
 departamento,candidato,menciones,sentimiento,nota
-AREQUIPA,KEIKO,40,-0.60,Protestas 'Keiko nunca más'; llegó de incógnito en medio de marchas (La República; El Búho)
-AREQUIPA,SANCHEZ,30,0.35,Base del sur; marcha y mitin 1-jun sin incidentes
-JUNIN,KEIKO,32,0.35,Ganó 1ra vuelta; recepción positiva en Huancayo (huaylarsh; cumpleaños) (Diario Correo)
-JUNIN,SANCHEZ,24,0.10,Centro andino competitivo
-ANCASH,KEIKO,26,0.30,Mítines Chimbote/Huarmey con promesas (puerto, hospital); ganó 1ra vuelta (TVPerú; Áncash Noticias)
-ANCASH,SANCHEZ,20,0.00,Sin actividad regional destacada en prensa
-SAN MARTIN,KEIKO,22,0.15,Mitin en Tarapoto 1-jun (telemedicina, programas sociales) (TVPerú)
-SAN MARTIN,SANCHEZ,22,0.20,Ganó 1ra vuelta por margen estrecho
-PASCO,KEIKO,15,0.10,Ganó 1ra vuelta; sierra centro disputada
-PASCO,SANCHEZ,15,0.05,
-CUSCO,KEIKO,35,-0.65,Bastión anti-fujimorista; protestas en el sur; Keiko nunca ganó
-CUSCO,SANCHEZ,35,0.45,Bastión de Sánchez (cierre de campaña sur)
-PUNO,KEIKO,35,-0.70,Fuerte rechazo histórico; Keiko nunca ganó Puno
-PUNO,SANCHEZ,35,0.50,Bastión sur andino
+LIMA,KEIKO,60,0.20,Lidera Lima (Ipsos 52.2) pero grandes marchas 'Keiko no va' (30-31 may)
+LIMA,SANCHEZ,45,-0.05,Débil en Lima metropolitana
+CALLAO,KEIKO,30,0.20,Ganó 1ra vuelta; patrón Lima
+CALLAO,SANCHEZ,22,-0.05,
+TUMBES,KEIKO,20,0.45,Su zona más fuerte (33.96% 1ra v.)
+TUMBES,SANCHEZ,15,-0.10,
+PIURA,KEIKO,35,0.40,Recibida por artesanos de Morropón y agricultores de Tambogrande
+PIURA,SANCHEZ,25,-0.05,Lejos en 1ra v. (100k vs 246k)
+LAMBAYEQUE,KEIKO,30,0.40,Ganó 1ra v. 26.41%; costa norte FP
+LAMBAYEQUE,SANCHEZ,22,-0.05,
+LA LIBERTAD,KEIKO,40,0.10,Ganó provincias costeras; marcha anti-Keiko en Trujillo
+LA LIBERTAD,SANCHEZ,35,0.15,Ganó provincias andinas; mitin en Trujillo
+ICA,KEIKO,25,0.25,Keiko 1ra v.; también hubo marcha anti-fujimorista
+ICA,SANCHEZ,20,0.05,
+LORETO,KEIKO,28,0.35,Ruta del Amazonas (Pucallpa-Contamana); lidera oriente 40-36
+LORETO,SANCHEZ,22,0.00,
+UCAYALI,KEIKO,28,0.30,Mítines en Pucallpa/Contamana; Keiko 1ra v.
+UCAYALI,SANCHEZ,24,0.10,Sánchez 2do en Pucallpa (12.8%)
+AMAZONAS,KEIKO,20,-0.30,Sánchez ganó 36.25% vs 17.36% Keiko
+AMAZONAS,SANCHEZ,24,0.35,Fuerte 1ra v.
+MADRE DE DIOS,KEIKO,18,-0.10,Sánchez ganó 1ra v.; zona de minería
+MADRE DE DIOS,SANCHEZ,20,0.25,
+CAJAMARCA,KEIKO,25,-0.35,Sierra norte pro-Sánchez
+CAJAMARCA,SANCHEZ,28,0.35,Ganó 1ra v.
+ANCASH,KEIKO,26,0.15,Mítines Chimbote/Huarmey; ganó 1ra v. (pero marcha en Huaraz)
+ANCASH,SANCHEZ,22,0.05,
+HUANUCO,KEIKO,22,-0.40,Sánchez ganó casi el doble
+HUANUCO,SANCHEZ,26,0.40,
+JUNIN,KEIKO,40,-0.30,Cierre en Huancayo 'francamente desfavorable': gresca quema de banderas FP lacrimógenas (Infobae)
+JUNIN,SANCHEZ,28,0.25,Centro andino; CPI centro 44-34 Sánchez
+PASCO,KEIKO,15,-0.05,Ganó 1ra v. estrecho; sierra centro disputada
+PASCO,SANCHEZ,15,0.10,
+HUANCAVELICA,KEIKO,20,-0.60,Sánchez 43.43% (de sus más altos)
+HUANCAVELICA,SANCHEZ,24,0.50,
+AYACUCHO,KEIKO,22,-0.60,Sur andino fuerte pro-Sánchez
+AYACUCHO,SANCHEZ,26,0.45,
+APURIMAC,KEIKO,20,-0.60,Sur andino fuerte pro-Sánchez
+APURIMAC,SANCHEZ,24,0.45,
+AREQUIPA,KEIKO,45,-0.60,Protestas 'Keiko nunca más'; llegó de incógnito entre marchas (La República)
+AREQUIPA,SANCHEZ,32,0.35,Base del sur; marcha y mitin 1-jun sin incidentes
+CUSCO,KEIKO,38,-0.65,Bastión anti-fujimorista; Keiko nunca ganó
+CUSCO,SANCHEZ,36,0.45,Bastión de Sánchez (cierre sur)
+PUNO,KEIKO,38,-0.70,Fuerte rechazo histórico; Keiko nunca ganó Puno
+PUNO,SANCHEZ,38,0.50,Bastión sur andino
+MOQUEGUA,KEIKO,18,-0.50,Keiko apenas 6.63% 1ra v.; marcha en el sur
+MOQUEGUA,SANCHEZ,20,0.40,
+TACNA,KEIKO,20,-0.50,Marcha 'Keiko no va'; Keiko nunca ganó Tacna
+TACNA,SANCHEZ,22,0.40,
+SAN MARTIN,KEIKO,22,0.10,Mitin Tarapoto 1-jun (telemedicina)
+SAN MARTIN,SANCHEZ,22,0.20,Ganó 1ra v. estrecho
